@@ -1379,7 +1379,7 @@ function aiSettingsCard() {
 async function boot() {
   $('#brand').addEventListener('click', () => { if (!S.shared) go('home'); });
   const hash = location.hash.slice(1);
-  if (hash && /^g-/.test(hash)) {
+  if (hash && /^[gb]-/.test(hash)) {
     try { S.shared = await parseAnyCode(hash); S.view = 'join'; } catch (e) { S.view = 'join'; S.linkError = true; }
   }
   render(); renderPill();
@@ -1625,8 +1625,12 @@ function openShare(p, pre) {
     if (gradeCls.length && !cls.size) return toast('Chọn lớp được giao để học sinh bấm chọn tên');
     const pk = { id: p.id, title: p.title, subject: p.subject, grade: p.grade, lesson: p.lesson, teacher: p.teacher, nq: p.nq, time: p.time, scale: p.scale, shuffleQ: p.shuffleQ, shuffleA: p.shuffleA, feedback: p.feedback, tabWatch: p.tabWatch, tabLimit: p.tabLimit, look: p.look, due: p.due, draft: p.draft, src: srcFor(p, [...chosen]) };
     const ros = {}; cls.forEach(c => ros[c] = S.roster.classes[c].map(s => s.name));
-    const code = 'g-' + await encodeObj({ v: 2, pk, games: [...chosen], mode: fb === 'end' ? 'test' : 'practice', fb, att, roster: ros, at: Date.now() });
-    const link = linkFor(code), codeEl = h('textarea', { class: 'code', readonly: true, rows: 2, style: { minHeight: '0', resize: 'none', whiteSpace: 'nowrap', overflow: 'hidden' } }); codeEl.value = link;
+    const obj = { v: 2, pk, games: [...chosen], mode: fb === 'end' ? 'test' : 'practice', fb, att, roster: ros, at: Date.now() };
+    const code = 'g-' + await encodeObj(obj);
+    let link = linkFor(code);
+    // Có máy chủ Firebase thì tạo link ngắn; lỗi mạng thì dùng tạm link dài như cũ
+    try { const s = await cloudShare(obj, { title: p.title, cls: [...cls] }); if (s) link = s; } catch (e) { toast('Chưa tạo được link ngắn (mạng hoặc máy chủ) — tạm dùng link dài', 5000); }
+    const codeEl = h('textarea', { class: 'code', readonly: true, rows: 2, style: { minHeight: '0', resize: 'none', whiteSpace: 'nowrap', overflow: 'hidden' } }); codeEl.value = link;
     p.classes = [...cls]; p.attempts = att ? att + ' lần' : 'Nhiều lần'; savePack(p);
     out.innerHTML = '';
     out.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Đường link giao bài'), codeEl,
@@ -2169,10 +2173,107 @@ vJoin = function () {
 };
 // Đang mở app mà bấm vào link giao bài khác thì chuyển ngay sang bài đó
 window.addEventListener('hashchange', async () => {
-  const hash = location.hash.slice(1); if (!/^g-/.test(hash)) return;
+  const hash = location.hash.slice(1); if (!/^[gb]-/.test(hash)) return;
   try { S.shared = await parseAnyCode(hash); S.linkError = false; S.sharedTest = false; } catch (e) { S.shared = null; S.linkError = true; }
   S.student = null; go('join');
 });
+
+/* ===== core3d: Firebase (Firestore) – link giao bài ngắn và nộp kết quả tự động =====
+   Dữ liệu được MÃ HÓA trên máy trước khi gửi lên Firestore:
+   - Bài giao (câu hỏi + họ tên lớp): khóa giải mã nằm trong đường link, không nằm trên máy chủ.
+   - Kết quả học sinh: mã hóa bằng khóa công khai của giáo viên, chỉ máy giáo viên giải mã được. */
+const FB = { projectId: '', apiKey: '' };   // điền sau khi thầy tạo dự án Firebase
+const fbOn = () => !!(FB.projectId && FB.apiKey);
+const fsUrl = path => 'https://firestore.googleapis.com/v1/projects/' + FB.projectId + '/databases/(default)/documents/' + path;
+async function fsCall(method, path, query, body) {
+  let r; try { r = await fetch(fsUrl(path) + '?' + (query ? query + '&' : '') + 'key=' + FB.apiKey, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw { code: 'network' }; }
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw { code: r.status === 404 ? 'not_found' : 'fs_error', message: j && j.error && j.error.message };
+  return j;
+}
+const fsDoc = d => ({ fields: { d: { stringValue: d }, at: { integerValue: String(Date.now()) } } });
+const rndId = n => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', b = crypto.getRandomValues(new Uint8Array(n)); return [...b].map(x => a[x % a.length]).join(''); };
+async function aesEnc(keyBytes, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12)), key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['encrypt']);
+  return b64u(iv) + '.' + b64u(new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(text))));
+}
+async function aesDec(keyBytes, packed) {
+  const [iv, ct] = packed.split('.').map(unb64u), key = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', false, ['decrypt']);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+}
+// Cặp khóa của giáo viên (tạo một lần, lưu trên máy giáo viên)
+async function teacherKeys() {
+  let kp = LS.get('dh.kp', null);
+  if (!kp) { const k = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']); kp = { pub: b64u(new Uint8Array(await crypto.subtle.exportKey('raw', k.publicKey))), priv: await crypto.subtle.exportKey('jwk', k.privateKey) }; LS.set('dh.kp', kp); }
+  return kp;
+}
+const ecPub = raw => crypto.subtle.importKey('raw', raw, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+const ecAes = (priv, pub, use) => crypto.subtle.deriveKey({ name: 'ECDH', public: pub }, priv, { name: 'AES-GCM', length: 256 }, false, [use]);
+
+/* Giáo viên: đưa bài giao lên, nhận link ngắn */
+async function cloudShare(obj, info) {
+  if (!fbOn()) return null;
+  obj.pub = (await teacherKeys()).pub;
+  const id = rndId(10), key = crypto.getRandomValues(new Uint8Array(16));
+  await fsCall('POST', 'bai', 'documentId=' + id, fsDoc(await aesEnc(key, await encodeObj(obj))));
+  const list = LS.get('dh.assign', []); list.unshift(Object.assign({ id, at: Date.now() }, info)); LS.set('dh.assign', list.slice(0, 200));
+  return appUrl() + '#b-' + id + '.' + b64u(key);
+}
+/* Học sinh: mở link ngắn */
+const __parse0 = parseAnyCode;
+parseAnyCode = async function (raw) {
+  const m = String(raw || '').trim().match(/b-([A-Z0-9]{6,20})\.([A-Za-z0-9_-]{16,})\s*$/);
+  if (!m) return __parse0(raw);
+  if (!fbOn()) throw new Error('Chưa cấu hình máy chủ');
+  const doc = await fsCall('GET', 'bai/' + m[1]);
+  const o = await decodeObj(await aesDec(unb64u(m[2]), doc.fields.d.stringValue)); o._type = 'g'; o.aid = m[1]; return o;
+};
+/* Học sinh: nộp kết quả tự động (ngoài việc vẫn hiện mã kết quả như cũ) */
+async function cloudSubmit(code) {
+  const sh = S.shared; if (!sh || !sh.aid || !sh.pub || !fbOn()) return false;
+  const eph = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+  const key = await ecAes(eph.privateKey, await ecPub(unb64u(sh.pub)), 'encrypt'), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(code)));
+  await fsCall('POST', 'bai/' + sh.aid + '/kq', '', fsDoc(b64u(new Uint8Array(await crypto.subtle.exportKey('raw', eph.publicKey))) + '.' + b64u(iv) + '.' + b64u(ct)));
+  return true;
+}
+const __note0 = noteAttempt;
+noteAttempt = function (code) {
+  __note0(code);
+  if (S.shared && S.shared.aid && !S.sharedTest) cloudSubmit(code).then(ok => { if (ok) toast('Đã nộp kết quả cho thầy cô ✓', 4000); }).catch(() => toast('Chưa nộp tự động được (mạng yếu). Em sao chép MÃ KẾT QUẢ gửi cho thầy cô nhé.', 6000));
+};
+/* Giáo viên: tải kết quả học sinh đã nộp về bảng điểm */
+async function cloudPull() {
+  if (!fbOn()) return { added: 0, n: 0 };
+  const kp = LS.get('dh.kp', null), list = LS.get('dh.assign', []).filter(a => Date.now() - a.at < 90 * 864e5); if (!kp || !list.length) return { added: 0, n: 0 };
+  const priv = await crypto.subtle.importKey('jwk', kp.priv, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey']);
+  const got = []; let n = 0;
+  for (const a of list.slice(0, 40)) {
+    let token = '';
+    do {
+      let j; try { j = await fsCall('GET', 'bai/' + a.id + '/kq', 'pageSize=300' + (token ? '&pageToken=' + token : '')); } catch (e) { break; }
+      for (const d of j.documents || []) {
+        try {
+          const [ep, iv, ct] = d.fields.d.stringValue.split('.').map(unb64u), key = await ecAes(priv, await ecPub(ep), 'decrypt');
+          const code = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+          const o = await __parse0(code), k = o.k; delete o.k; delete o._type; o.flag = k !== sum32(JSON.stringify(o)); got.push(o); n++;
+        } catch (e) { }
+      }
+      token = j.nextPageToken || '';
+    } while (token);
+  }
+  return { added: mergeResults(got), n };
+}
+function cloudCard() {
+  if (!fbOn()) return null;
+  const msg = h('span', { class: 'small muted' }, 'Đang tải kết quả học sinh đã nộp…');
+  const run = async () => { msg.textContent = 'Đang tải…'; try { const r = await cloudPull(); msg.textContent = r.added ? 'Có ' + r.added + ' kết quả mới.' : 'Không có kết quả mới (đã nhận ' + r.n + ' lượt nộp).'; if (r.added && S.view === 'scores') render(); } catch (e) { msg.textContent = 'Chưa tải được – kiểm tra mạng.'; } };
+  if (!S.pulledAt || Date.now() - S.pulledAt > 20000) { S.pulledAt = Date.now(); run(); } else msg.textContent = 'Kết quả học sinh nộp qua link ngắn tự về đây.';
+  return h('div', { class: 'card row' }, h('div', { class: 'grow' }, h('h3', null, 'Kết quả nộp tự động'), msg), h('button', { class: 'btn primary', onclick: run }, 'Tải kết quả mới'));
+}
+const __exportCard0 = exportCard;
+exportCard = function (a, b) { return [cloudCard(), __exportCard0(a, b)]; };
 
 /* ===== 20 TRÒ CHƠI DÙNG CÂU TRẮC NGHIỆM ===== */
 const COLORS = ['#E35D4B', '#3C8DD8', '#F3B53A', '#2E9B63', '#8A55C9', '#E07BB0', '#4FB8B0', '#C98A3A'];
