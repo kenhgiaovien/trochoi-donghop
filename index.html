@@ -668,7 +668,7 @@ const SUBJECTS = ['Ngữ văn', 'Toán', 'Tiếng Anh', 'Khoa học tự nhiên'
 const LOOKS = { board: 'Bảng xanh', ocean: 'Đại dương', dusk: 'Hoàng hôn', paper: 'Giấy trắng' };
 
 /* ===== Điều hướng ===== */
-const NAV = [['home', 'Tạo nhanh'], ['library', 'Thư viện bài'], ['hub', 'Kho trò chơi'], ['roster', 'Lớp học'], ['scores', 'Bảng điểm'], ['help', 'Cài đặt']];
+const NAV = [['home', 'Trang chủ'], ['library', 'Thư viện bài'], ['editor', 'Tạo trò chơi'], ['hub', 'Kho trò chơi'], ['roster', 'Lớp học'], ['scores', 'Bảng điểm'], ['help', 'Cài đặt & HD']];
 let RUN = null;
 function go(view, arg) {
   if (RUN) { RUN.stop(); RUN = null; }
@@ -1761,9 +1761,12 @@ function vHelp() {
   // Logo
   const logoIn = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: e => { const fl = e.target.files[0]; if (!fl) return; const img = new Image(); img.onload = () => { const cv = h('canvas', { width: 144, height: 144 }), x = cv.getContext('2d'), s = Math.min(img.width, img.height); x.fillStyle = '#fff'; x.fillRect(0, 0, 144, 144); x.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 144, 144); S.logo = cv.toDataURL('image/jpeg', .9); LS.set('dh.logo', S.logo); render(); }; img.src = URL.createObjectURL(fl); } });
   const li = (...xs) => h('ul', { style: { margin: 0, paddingLeft: '20px', display: 'grid', gap: '4px' } }, xs.map(x => h('li', null, x)));
-  const v = h('div', { class: 'view' }, h('h1', null, 'Cài đặt'), h('p', { class: 'muted' }, 'Các mục dưới đây chỉ cần làm một lần trên máy của thầy cô.'), profile, aiSettingsCard(), kho, ppct,
+  const v = h('div', { class: 'view' }, h('h1', null, 'Cài đặt và hướng dẫn'), h('p', { class: 'muted' }, 'Các mục dưới đây chỉ cần làm một lần trên máy của thầy cô.'), profile, aiSettingsCard(), kho, ppct,
     sec('logo', 'Logo', h('p', { class: 'small muted' }, 'Logo Trường THCS Đồng Hợp đã gắn sẵn trong app cho cả giáo viên và học sinh. Chỉ đổi khi cần dùng logo khác trên máy này.'), h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => logoIn.click() }, 'Đổi logo trên máy này'), logoIn, S.logo ? h('button', { class: 'btn ghost', onclick: () => { S.logo = ''; LS.set('dh.logo', ''); render(); } }, 'Dùng lại logo trường') : null)),
     sec('hd', 'Cách dùng nhanh', li('Tạo nhanh: chọn môn, khối, bài → chọn trò → Chơi trên máy chiếu hoặc Giao bài.', 'Giao bài: chọn lớp → Tạo link → gửi Zalo. Học sinh bấm link, chọn tên, chơi, gửi lại mã kết quả.', 'Bảng điểm: dán các mã kết quả → Xuất Excel theo danh sách lớp (đúng thứ tự danh sách đã tải lên).', 'Chia sẻ bài cho đồng nghiệp: Thư viện bài → Xuất toàn bộ → gửi tệp → đồng nghiệp bấm Nhập tệp bài.')),
+    sec('qt', 'Quy trình giáo viên', li('Tạo trò chơi → điền thông tin bài → tải SGK/giáo án → TẠO CÂU HỎI BẰNG AI (hoặc tự nhập).', 'Kiểm duyệt từng mục (Trắc nghiệm, Cặp ghép, Từ khóa…) → DUYỆT VÀ LƯU.', 'Kho trò chơi: chọn trò sáng màu để trình chiếu. Trò có nhãn "đội" chơi được 2–4 đội trên một máy chiếu.', 'PHÁT HÀNH / Giao bài: chọn trò, số lần làm, lớp → sao chép link gửi Zalo lớp.', 'Bảng điểm: dán mã kết quả học sinh gửi về → xem thống kê, xuất Excel.')),
+    sec('cg', 'Chuyển giao cho giáo viên khác', li('Gửi đường link app cho đồng nghiệp. Mỗi giáo viên có thư viện bài, lớp học, bảng điểm riêng trên máy của mình.', 'Muốn tặng bài đã soạn: Thư viện bài → Xuất toàn bộ (.json) → đồng nghiệp bấm Nhập tệp bài.')),
+    sec('bv', 'Bảo vệ dữ liệu học sinh', li('Danh sách học sinh không nằm trong mã nguồn app.', 'Không gửi tên học sinh cho AI khi soạn câu hỏi.', 'Link giao bài chỉ kèm họ tên của lớp được chọn; không đăng link lên trang công khai.')),
     sec('gh', 'Giới hạn cần biết', li('Dữ liệu (bài, lớp, điểm, tài liệu) lưu trong trình duyệt của máy này. Không xóa dữ liệu duyệt web; nên Xuất tệp sao lưu định kỳ.', 'Số lần làm được đếm theo từng máy; học sinh đổi máy có thể làm lại — thầy cô đối chiếu số lần trong bảng điểm.', 'Số lần rời trang chỉ để tham khảo, không phải bằng chứng gian lận.', 'Chưa có bảng điều khiển trực tiếp thời gian thực (cần máy chủ riêng).')));
   if (S.helpFocus) { const id = S.helpFocus; S.helpFocus = null; setTimeout(() => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); }
   return v;
@@ -1866,6 +1869,27 @@ async function runAI(pk, opt) {
   }
 }
 
+/* Hai ô lối vào như trang chủ bản đầu: Giáo viên / Học sinh, kèm số liệu */
+function homeHero() {
+  const nGames = GAMES.filter(g => g.kind !== 'tool').length, nTools = GAMES.length - nGames;
+  const nStu = S.roster ? Object.values(S.roster.classes).reduce((a, c) => a + c.length, 0) : 0;
+  return h('div', { class: 'hero' },
+    h('button', { class: 'door t', type: 'button', onclick: () => go('library') },
+      h('span', { class: 'small muted' }, 'GIÁO VIÊN / QUẢN TRỊ'),
+      h('h2', null, 'Soạn bài, chọn trò chơi, trình chiếu và giao bài'),
+      h('p', { class: 'muted' }, 'Nhập nội dung một lần, dùng được cho mọi trò chơi. Có AI soạn nháp từ SGK, kế hoạch bài dạy.'),
+      h('div', { class: 'kpis' },
+        h('div', { class: 'kpi' }, h('b', null, nGames), h('span', null, 'trò chơi')),
+        h('div', { class: 'kpi' }, h('b', null, nTools), h('span', null, 'công cụ lớp học')),
+        h('div', { class: 'kpi' }, h('b', null, S.lib.length), h('span', null, 'bài đã soạn')),
+        h('div', { class: 'kpi' }, h('b', null, nStu || '—'), h('span', null, 'học sinh đã nhập')))),
+    h('button', { class: 'door', type: 'button', onclick: () => { S.shared = null; go('join'); } },
+      h('span', { class: 'small muted' }, 'HỌC SINH THAM GIA'),
+      h('h2', null, 'Vào chơi bằng đường link hoặc mã thầy cô gửi'),
+      h('p', { class: 'muted' }, 'Chọn lớp → chọn họ và tên → bắt đầu. Không cần mật khẩu.'),
+      h('span', { class: 'btn sun big', style: { justifySelf: 'start' } }, 'Nhập mã tham gia')));
+}
+
 /* ---------- TẠO NHANH ---------- */
 function vHome() {
   const Q = Object.assign({ subject: S.profile.subject || '', grade: '', lesson: '', custom: '', period: 'Toàn bài', classes: [], game: 'q2', nq: 10 }, S.quick);
@@ -1890,7 +1914,8 @@ function vHome() {
   const lessonName = () => (custom ? Q.custom : Q.lesson || '').trim();
   const set = (k, val, re) => { Q[k] = val; saveQ(); if (re) render(); };
   const subs = SUBJECTS.slice(); if (Q.subject && !subs.includes(Q.subject)) subs.unshift(Q.subject);
-  const subSel = h('select', { id: 'q-sub', onchange: e => { Q.lesson = ''; Q.period = 'Toàn bài'; set('subject', e.target.value, true); } }, h('option', { value: '' }, '— Chọn môn —'), subs.map(t => h('option', { value: t, selected: Q.subject === t }, t)));
+  const subSel = h('select', { id: 'q-sub', onchange: e => { Q.lesson = ''; Q.period = 'Toàn bài'; if (e.target.value === '__other') { Q.subOther = true; set('subject', '', true); } else { Q.subOther = false; set('subject', e.target.value, true); } } }, h('option', { value: '' }, '— Chọn môn —'), subs.map(t => h('option', { value: t, selected: Q.subject === t && !Q.subOther }, t)), h('option', { value: '__other', selected: !!Q.subOther }, '✎ Nhập môn mới…'));
+  const subOtherIn = Q.subOther ? h('input', { type: 'text', id: 'q-sub-other', placeholder: 'Gõ tên môn mới rồi nhấn Enter', value: Q.subject, onchange: e => set('subject', e.target.value.trim(), true) }) : null;
   const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.lesson = ''; Q.classes = []; Q.period = 'Toàn bài'; saveQ(); render(); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
   const lessonSel = h('select', { id: 'q-lesson', onchange: e => { Q.period = 'Toàn bài'; set('lesson', e.target.value, true); } },
     h('option', { value: '' }, !Q.subject || !Q.grade ? '— Chọn môn và khối trước —' : list.length ? '— Bấm để chọn bài (' + list.length + ' bài) —' : '— Chưa có danh sách bài của môn này —'),
@@ -1946,7 +1971,7 @@ function vHome() {
       h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
     h('div', { class: 'card quick' },
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '1'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn bài'),
-        h('div', { class: 'fgrid' }, f('Môn học', subSel), f('Khối', gradeSel)),
+        h('div', { class: 'fgrid' }, f('Môn học', subSel, subOtherIn), f('Khối', gradeSel)),
         f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn),
         periodSel ? f('Tiết', periodSel) : null,
         Q.subject && Q.grade && !(S.ppct[key] || []).length && !(S.matLessons[key] || []).length ? h('div', { class: 'note' }, 'Để ô Tên bài sổ ra đủ danh sách bài của ' + Q.subject + ' ' + Q.grade + ', thầy cô làm 1 trong 2 việc (một lần): ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => goHelp('kho') }, 'Tải sách giáo khoa vào kho'), h('button', { class: 'btn', onclick: () => goHelp('ppct') }, 'Tải / dán phân phối chương trình'))) : null)),
@@ -1956,7 +1981,7 @@ function vHome() {
         f('Lớp (chỉ cần khi giao bài cho học sinh)', classBox),
         h('div', { class: 'row' }, h('button', { class: 'btn primary big qgo', onclick: () => quickStart('play') }, '▶ Chơi trên máy chiếu'), h('button', { class: 'btn sun big qgo', onclick: () => quickStart('share') }, 'Giao bài cho học sinh')),
         h('p', { class: 'small muted' }, 'Chơi trên máy chiếu, màn hình hiển thị theo đội; hoặc gửi link để học sinh tự làm và nộp mã kết quả. Bài đã có câu hỏi sẽ mở ngay.'), status))),
-    pills,
+    pills, homeHero(),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Bài đã lưu – bấm Chơi để chơi lại ngay'), h('button', { class: 'btn', onclick: () => go('editor', null) }, 'Tự soạn / dán câu hỏi')), libTable(S.lib.slice(0, 6))));
   return v;
 }
