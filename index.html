@@ -7,7 +7,12 @@
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#1D4A3D">
-<meta name="description" content="TrÃ² chÆ¡i há»c táº­p - TrÆ°á»ng THCS Äá»“ng Há»£p">
+<meta name="description" content="Trò chơi học tập – Trường THCS Đồng Hợp">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Trường THCS Đồng Hợp">
+<meta property="og:title" content="Trò chơi học tập – Trường THCS Đồng Hợp">
+<meta property="og:description" content="Bấm vào link, chọn lớp, chọn tên của em và bắt đầu chơi.">
+<meta property="og:image" content="https://kenhgiaovien.github.io/trochoi-donghop/icon-512.png">
 <title>Đồng Hợp Smart Learning Games</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1307,7 +1312,7 @@ function vScores() {
     saveFile('bang-diem' + (fc ? '-' + fc : '') + '.csv', '\uFEFF' + lines.join('\r\n'));
   };
   v.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Kết quả'), f1, f2,
-    h('button', { class: 'btn', onclick: exportCSV }, 'Xuất mọi lượt (CSV)'),
+    h('button', { class: 'btn', onclick: () => exportDetail(rows()) }, 'Xuất chi tiết mọi lượt (Excel)'),
     h('button', { class: 'btn danger', onclick: e => { if (e.target.dataset.c) { S.results = []; LS.set('dh.results', []); cloudWrite(() => cDoc('results').set({ list: [] })); render(); } else { e.target.dataset.c = 1; e.target.textContent = 'Bấm lần nữa để xóa hết'; } } }, 'Xóa bảng điểm')), tbl),
     exportCard(() => fc, () => fp),
     h('p', { class: 'small muted' }, 'Mã kết quả có mã kiểm tra để phát hiện chỉnh sửa thông thường, nhưng không thay thế được hệ thống chấm trên máy chủ. Phù hợp luyện tập và kiểm tra thường xuyên.'));
@@ -2081,45 +2086,71 @@ function vHome() {
   return v;
 }
 
-/* ---------- XUẤT EXCEL: lớp / khối / cả trường ---------- */
+/* ---------- XUẤT EXCEL: sổ điểm theo lớp / khối / cả trường, quy về thang điểm 10 ---------- */
+const CALC = { max: 'Điểm cao nhất', avg: 'Trung bình các lần làm', last: 'Lần làm cuối cùng' };
+const r1 = x => Math.round(x * 10) / 10;
+const to10 = r => r1(r.sc / r.max * 10);
+// Điểm một bài của một học sinh (thang 10): gộp mọi trò, mọi lần làm của bài đó theo cách tính đã chọn
+function scoreOf(list, mode) {
+  if (!list.length) return null;
+  if (mode === 'last') return to10(list.slice().sort((a, b) => a.at - b.at).pop());
+  const v = list.map(r => r.sc / r.max * 10);
+  return r1(mode === 'avg' ? v.reduce((a, b) => a + b, 0) / v.length : Math.max.apply(null, v));
+}
+const DETAIL_HEAD = ['Lớp', 'STT', 'Họ và tên', 'Bài', 'Trò chơi', 'Lần làm', 'Điểm (thang 10)', 'Điểm gốc', 'Thang gốc', 'Số đúng', 'Tổng lượt', 'Thời gian (giây)', 'Rời trang', 'Nộp lúc', 'Ghi chú'];
+const detailRows = list => list.slice().sort((a, b) => a.cls.localeCompare(b.cls) || (a.stt || 999) - (b.stt || 999) || a.name.localeCompare(b.name, 'vi') || a.title.localeCompare(b.title, 'vi') || a.at - b.at)
+  .map(r => [r.cls, r.stt || '', r.name, r.title, r.game, r.lan || '', to10(r), r.sc, r.max, r.c, r.n, r.sec, r.tab || 0, fmtDate(r.at), r.flag ? 'Mã bất thường' : (r.mode === 'test' ? 'Kiểm tra' : 'Luyện tập')]);
+async function writeBook(name, sheets) {
+  const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
+  const wb = XLSX.utils.book_new();
+  sheets.forEach(s => { const ws = XLSX.utils.aoa_to_sheet(s.rows); ws['!cols'] = s.cols.map(w => ({ wch: w })); if (s.merges) ws['!merges'] = s.merges; XLSX.utils.book_append_sheet(wb, ws, s.name.replace(/[\\\/?*\[\]:]/g, ' ').slice(0, 28)); });
+  await saveFile(name, new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+}
 async function exportByRoster(scope, fp) {
+  const mode = LS.get('dh.calc', 'max');
   const rs = S.results.filter(r => !fp || r.title === fp);
   const all = S.roster ? Object.keys(S.roster.classes) : [...new Set(rs.map(r => r.cls))];
-  const classes = (scope.cls ? [scope.cls] : scope.grade ? all.filter(c => c.startsWith(scope.grade)) : all).filter(c => scope.cls || !S.roster || rs.some(r => r.cls === c) || scope.grade).sort();
+  const classes = (scope.cls ? [scope.cls] : scope.grade ? all.filter(c => c.startsWith(scope.grade)) : all.filter(c => !S.roster || rs.some(r => r.cls === c))).sort();
   if (!classes.length) return toast('Chưa có lớp nào để xuất');
-  const titles = [...new Set(rs.filter(r => classes.includes(r.cls)).map(r => r.title))];
-  const one = titles.length === 1;
-  const head = ['STT', 'Họ và tên', 'Lớp'].concat(one ? ['Điểm', 'Số lần làm', 'Số câu đúng', 'Thời gian (giây)', 'Rời trang', 'Nộp lúc'] : titles.length ? titles : ['Điểm']);
+  const inScope = rs.filter(r => classes.includes(r.cls));
+  if (!inScope.length) return toast('Chưa có kết quả nào của ' + (scope.cls ? 'lớp ' + scope.cls : scope.grade ? 'khối ' + scope.grade : 'các lớp') + ' để xuất');
+  const titles = [...new Set(inScope.slice().sort((a, b) => a.at - b.at).map(r => r.title))];
+  const head = ['STT', 'Họ và tên', 'Lớp'].concat(titles, ['Điểm TB', 'Số bài đã làm', 'Tổng số lần làm']);
   const rowsOf = c => {
-    const names = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [...new Set(rs.filter(r => r.cls === c).map(r => r.name))];
-    return names.map((name, i) => {
-      const row = [i + 1, name, c];
-      (titles.length ? titles : [null]).forEach(t => {
-        const mine = rs.filter(r => r.cls === c && (!t || r.title === t) && (r.stt && S.roster ? r.stt === i + 1 : r.name === name));
-        const best = mine.slice().sort((a, b) => b.sc / b.max - a.sc / a.max)[0];
-        if (one) row.push(best ? best.sc : '', mine.length || '', best ? best.c + '/' + best.n : '', best ? best.sec : '', best ? best.tab : '', best ? fmtDate(best.at) : ''); else row.push(best ? best.sc : '');
-      });
-      return row;
-    });
+    const ros = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [];
+    const mine = (name, i, t) => inScope.filter(r => r.cls === c && r.title === t && (r.stt && ros.length ? r.stt === i + 1 : r.name === name));
+    const line = (name, i, stt) => { const lists = titles.map(t => mine(name, i, t)), sc = lists.map(l => scoreOf(l, mode)), done = sc.filter(x => x != null), n = lists.reduce((a, l) => a + l.length, 0); return [stt, name, c].concat(sc.map(x => x == null ? '' : x), [done.length ? r1(done.reduce((a, b) => a + b, 0) / done.length) : '', done.length || '', n || '']); };
+    const out = ros.map((name, i) => line(name, i, i + 1));
+    // học sinh tự gõ tên, không có trong danh sách lớp: xếp cuối để giáo viên đối chiếu
+    [...new Set(inScope.filter(r => r.cls === c && !(r.stt && ros.length) && !ros.includes(r.name)).map(r => r.name))].forEach(name => out.push(line(name, -1, '')));
+    return out;
   };
-  const sheets = classes.map(c => [c, [head].concat(rowsOf(c))]);
-  const name = 'bang-diem-' + (scope.cls || (scope.grade ? 'khoi-' + scope.grade : 'ca-truong')) + '.xlsx';
-  try {
-    const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
-    const wb = XLSX.utils.book_new(), cols = [{ wch: 5 }, { wch: 28 }, { wch: 7 }].concat(head.slice(3).map(() => ({ wch: 16 })));
-    const add = (n, rows) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = cols; XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 28)); };
-    if (sheets.length > 1) add('Tong hop', [head].concat(...sheets.map(s => s[1].slice(1))));
-    sheets.forEach(([c, rows]) => add(c, rows));
-    await saveFile(name, new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-  } catch (e) { saveFile(name.replace('.xlsx', '.csv'), '﻿' + [head].concat(...sheets.map(s => s[1].slice(1))).map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\r\n')); }
+  const note = 'Trường THCS Đồng Hợp  ·  Thang điểm 10  ·  Điểm mỗi bài: ' + CALC[mode].toLowerCase() + '  ·  Điểm TB: trung bình các bài đã làm  ·  Xuất lúc ' + fmtDate(Date.now());
+  const cols = [5, 28, 7].concat(titles.map(t => Math.max(12, Math.min(34, t.length + 2))), [10, 14, 16]);
+  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: head.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: head.length - 1 } }];
+  const sheet = (name, title, rows) => ({ name, cols, merges, rows: [[title], [note], [], head].concat(rows) });
+  const per = classes.map(c => [c, rowsOf(c)]);
+  const label = scope.cls ? 'Lớp ' + scope.cls : scope.grade ? 'Khối ' + scope.grade : 'Toàn trường';
+  const sheets = [];
+  if (per.length > 1) sheets.push(sheet('Tong hop', 'SỔ ĐIỂM TRÒ CHƠI HỌC TẬP – ' + label.toUpperCase(), [].concat.apply([], per.map(p => p[1]))));
+  per.forEach(([c, rows]) => sheets.push(sheet(c, 'SỔ ĐIỂM TRÒ CHƠI HỌC TẬP – LỚP ' + c, rows)));
+  sheets.push({ name: 'Chi tiet cac lan lam', cols: [7, 5, 26, 30, 22, 8, 14, 9, 10, 9, 10, 15, 10, 18, 14], rows: [DETAIL_HEAD].concat(detailRows(inScope)) });
+  const file = 'so-diem-' + (scope.cls || (scope.grade ? 'khoi-' + scope.grade : 'toan-truong')) + '.xlsx';
+  try { await writeBook(file, sheets); } catch (e) { toast('Chưa tạo được tệp Excel — kiểm tra mạng rồi bấm lại'); }
+}
+async function exportDetail(list) {
+  if (!list.length) return toast('Chưa có dữ liệu');
+  try { await writeBook('chi-tiet-cac-lan-lam.xlsx', [{ name: 'Chi tiet cac lan lam', cols: [7, 5, 26, 30, 22, 8, 14, 9, 10, 9, 10, 15, 10, 18, 14], rows: [DETAIL_HEAD].concat(detailRows(list)) }]); } catch (e) { toast('Chưa tạo được tệp Excel — kiểm tra mạng rồi bấm lại'); }
 }
 function exportCard(getCls, getTitle) {
   const all = S.roster ? Object.keys(S.roster.classes).sort() : [...new Set(S.results.map(r => r.cls))].sort();
   const grades = [...new Set(all.map(c => c[0]))].sort();
   const clsSel = h('select', { id: 'ex-cls', style: { maxWidth: '170px' } }, h('option', { value: '' }, '— Chọn lớp —'), all.map(c => h('option', { value: c, selected: getCls() === c }, c)));
+  const calcSel = h('select', { id: 'ex-calc', style: { maxWidth: '260px' }, onchange: e => LS.set('dh.calc', e.target.value) }, Object.entries(CALC).map(([k, n]) => h('option', { value: k, selected: LS.get('dh.calc', 'max') === k }, n)));
   const b = (label, scope, cls) => h('button', { class: 'btn ' + (cls || ''), onclick: () => exportByRoster(scope(), getTitle()) }, label);
-  return h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Xuất Excel – bấm là tải về'),
-    h('p', { class: 'small muted' }, 'Tệp xuất đúng thứ tự danh sách lớp đã tải lên, kèm điểm cao nhất và số lần làm. Xuất khối hoặc cả trường thì mỗi lớp một trang tính, thêm trang Tổng hợp. Đang lọc theo bài nào ở trên thì xuất theo bài đó.'),
+  return h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Xuất sổ điểm Excel – bấm là tải về'),
+    h('p', { class: 'small muted' }, 'Mỗi học sinh một dòng, đúng thứ tự danh sách lớp đã tải lên. Mỗi bài một cột điểm, đã quy về thang 10 (bài chấm thang 100 cũng tự quy đổi). Học sinh chơi nhiều trò, nhiều lần trong một bài thì gộp thành một điểm theo cách tính bên dưới. Cuối dòng có Điểm TB. Tệp có thêm trang "Chi tiết các lần làm".'),
+    h('div', { class: 'row' }, h('label', { class: 'small', for: 'ex-calc' }, 'Điểm mỗi bài lấy:'), calcSel),
     h('div', { class: 'row' }, clsSel, h('button', { class: 'btn primary', onclick: () => clsSel.value ? exportByRoster({ cls: clsSel.value }, getTitle()) : toast('Chọn lớp cần xuất') }, 'Xuất lớp này'),
       grades.map(g => b('Xuất khối ' + g, () => ({ grade: g }))), b('Xuất cả trường', () => ({}), 'sun')));
 }
@@ -2274,7 +2305,7 @@ function cloudCard() {
   return h('div', { class: 'card row' }, h('div', { class: 'grow' }, h('h3', null, 'Kết quả nộp tự động'), msg), h('button', { class: 'btn primary', onclick: run }, 'Tải kết quả mới'));
 }
 const __exportCard0 = exportCard;
-exportCard = function (a, b) { return [cloudCard(), __exportCard0(a, b)]; };
+exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== 20 TRÒ CHƠI DÙNG CÂU TRẮC NGHIỆM ===== */
 const COLORS = ['#E35D4B', '#3C8DD8', '#F3B53A', '#2E9B63', '#8A55C9', '#E07BB0', '#4FB8B0', '#C98A3A'];
