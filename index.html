@@ -2119,13 +2119,13 @@ async function exportByRoster(scope, fp) {
   const rowsOf = c => {
     const ros = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [];
     const mine = (name, i, t) => inScope.filter(r => r.cls === c && r.title === t && (r.stt && ros.length ? r.stt === i + 1 : r.name === name));
-    const line = (name, i, stt) => { const lists = titles.map(t => mine(name, i, t)), sc = lists.map(l => scoreOf(l, mode)), done = sc.filter(x => x != null), n = lists.reduce((a, l) => a + l.length, 0); return [stt, name, c].concat(sc.map(x => x == null ? '' : x), [done.length ? r1(done.reduce((a, b) => a + b, 0) / done.length) : '', done.length || '', n || '']); };
+    const line = (name, i, stt) => { const lists = titles.map(t => mine(name, i, t)), sc = lists.map(l => scoreOf(l, mode)), done = sc.filter(x => x != null), n = lists.reduce((a, l) => a + l.length, 0); return [stt, name, c].concat(sc.map(x => x == null ? 0 : x), [r1(done.reduce((a, b) => a + b, 0) / titles.length), done.length, n]); };   // bài chưa làm tính 0 điểm
     const out = ros.map((name, i) => line(name, i, i + 1));
     // học sinh tự gõ tên, không có trong danh sách lớp: xếp cuối để giáo viên đối chiếu
     [...new Set(inScope.filter(r => r.cls === c && !(r.stt && ros.length) && !ros.includes(r.name)).map(r => r.name))].forEach(name => out.push(line(name, -1, '')));
     return out;
   };
-  const note = 'Trường THCS Đồng Hợp  ·  Thang điểm 10  ·  Điểm mỗi bài: ' + CALC[mode].toLowerCase() + '  ·  Điểm TB: trung bình các bài đã làm  ·  Xuất lúc ' + fmtDate(Date.now());
+  const note = 'Trường THCS Đồng Hợp  ·  Thang điểm 10  ·  Điểm mỗi bài: ' + CALC[mode].toLowerCase() + '  ·  Điểm TB: trung bình tất cả các bài (bài chưa làm tính 0 điểm)  ·  Xuất lúc ' + fmtDate(Date.now());
   const cols = [5, 28, 7].concat(titles.map(t => Math.max(12, Math.min(34, t.length + 2))), [10, 14, 16]);
   const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: head.length - 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: head.length - 1 } }];
   const sheet = (name, title, rows) => ({ name, cols, merges, rows: [[title], [note], [], head].concat(rows) });
@@ -2149,7 +2149,7 @@ function exportCard(getCls, getTitle) {
   const calcSel = h('select', { id: 'ex-calc', style: { maxWidth: '260px' }, onchange: e => LS.set('dh.calc', e.target.value) }, Object.entries(CALC).map(([k, n]) => h('option', { value: k, selected: LS.get('dh.calc', 'max') === k }, n)));
   const b = (label, scope, cls) => h('button', { class: 'btn ' + (cls || ''), onclick: () => exportByRoster(scope(), getTitle()) }, label);
   return h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Xuất sổ điểm Excel – bấm là tải về'),
-    h('p', { class: 'small muted' }, 'Mỗi học sinh một dòng, đúng thứ tự danh sách lớp đã tải lên. Mỗi bài một cột điểm, đã quy về thang 10 (bài chấm thang 100 cũng tự quy đổi). Học sinh chơi nhiều trò, nhiều lần trong một bài thì gộp thành một điểm theo cách tính bên dưới. Cuối dòng có Điểm TB. Tệp có thêm trang "Chi tiết các lần làm".'),
+    h('p', { class: 'small muted' }, 'Mỗi học sinh một dòng, đúng thứ tự danh sách lớp đã tải lên. Mỗi bài một cột điểm, đã quy về thang 10 (bài chấm thang 100 cũng tự quy đổi). Học sinh chơi nhiều trò, nhiều lần trong một bài thì gộp thành một điểm theo cách tính bên dưới. Cuối dòng có Điểm TB (bài chưa làm tính 0 điểm). Tệp có thêm trang "Chi tiết các lần làm".'),
     h('div', { class: 'row' }, h('label', { class: 'small', for: 'ex-calc' }, 'Điểm mỗi bài lấy:'), calcSel),
     h('div', { class: 'row' }, clsSel, h('button', { class: 'btn primary', onclick: () => clsSel.value ? exportByRoster({ cls: clsSel.value }, getTitle()) : toast('Chọn lớp cần xuất') }, 'Xuất lớp này'),
       grades.map(g => b('Xuất khối ' + g, () => ({ grade: g }))), b('Xuất cả trường', () => ({}), 'sun')));
