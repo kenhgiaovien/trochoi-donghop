@@ -2182,7 +2182,8 @@ window.addEventListener('hashchange', async () => {
    Dữ liệu được MÃ HÓA trên máy trước khi gửi lên Firestore:
    - Bài giao (câu hỏi + họ tên lớp): khóa giải mã nằm trong đường link, không nằm trên máy chủ.
    - Kết quả học sinh: mã hóa bằng khóa công khai của giáo viên, chỉ máy giáo viên giải mã được. */
-const FB = { projectId: '', apiKey: '' };   // điền sau khi thầy tạo dự án Firebase
+// Cấu hình Firebase Web của dự án trochoi-donghop (công khai theo thiết kế; dữ liệu được bảo vệ bằng quy tắc Firestore)
+const FB = { projectId: 'trochoi-donghop', apiKey: 'AIzaSyDkVUw_Uff2Zk7XhNjFabNde8kLpOEjIcc' };
 const fbOn = () => !!(FB.projectId && FB.apiKey);
 const fsUrl = path => 'https://firestore.googleapis.com/v1/projects/' + FB.projectId + '/databases/(default)/documents/' + path;
 async function fsCall(method, path, query, body) {
