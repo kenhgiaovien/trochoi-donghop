@@ -1927,6 +1927,19 @@ function vHome() {
   Q.classes = Q.classes.filter(c => classes.includes(c));
   const classBox = classes.length ? h('div', { class: 'chips' }, classes.map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.classes.includes(c), onclick: e => { Q.classes = Q.classes.includes(c) ? Q.classes.filter(x => x !== c) : Q.classes.concat(c); saveQ(); e.currentTarget.setAttribute('aria-pressed', Q.classes.includes(c)); } }, c)))
     : h('div', { class: 'small muted' }, S.roster ? 'Chọn khối để hiện lớp.' : ['Chưa có danh sách học sinh. ', h('button', { class: 'btn', onclick: () => go('roster') }, 'Tải danh sách lên (1 lần)')]);
+  // Tải tài liệu (SGK, kế hoạch bài dạy) theo đúng môn và khối đang chọn
+  const matMsg = h('span', { class: 'small muted' }, 'Đang kiểm tra kho…');
+  const showMat = async () => { const ms = (await matAll()).filter(m => m.subject === Q.subject && String(m.grade) === String(Q.grade)); matMsg.textContent = !Q.subject || !Q.grade ? 'Chọn môn và khối trước khi tải.' : ms.length ? 'Đã có ' + ms.length + ' tệp cho ' + Q.subject + ' ' + Q.grade + ': ' + ms.map(m => m.name).join(', ') : 'Chưa có tài liệu nào cho ' + Q.subject + ' ' + Q.grade + '.'; };
+  showMat();
+  const matIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md', hidden: true, onchange: async e => {
+    let ok = 0; const bad = [];
+    for (const file of e.target.files) { matMsg.textContent = 'Đang đọc ' + file.name + '…'; try { const text = (await extractText(file)).replace(/\n{3,}/g, '\n\n'); if (text.replace(/\s/g, '').length < 200) throw new Error('không có chữ'); await matPut({ id: uid(), name: file.name, subject: Q.subject, grade: Q.grade, kind: /khbd|kế hoạch|ke hoach|giáo án|giao an/i.test(file.name) ? 'Kế hoạch bài dạy' : 'Sách giáo khoa', text: text.slice(0, 3000000), at: Date.now() }); ok++; } catch (err) { bad.push(file.name + ' (' + (err.message || 'lỗi') + ')'); } }
+    e.target.value = '';
+    if (bad.length) { toast('Không đọc được: ' + bad.join('; '), 6000); await showMat(); if (ok) { await refreshMatLessons(); } }
+    else { await refreshMatLessons(); toast('Đã lưu ' + ok + ' tệp vào kho ' + Q.subject + ' ' + Q.grade); render(); }
+  } });
+  const matRow = h('div', { class: 'f' }, h('span', null, 'Tài liệu tham khảo (SGK, kế hoạch bài dạy) – tải một lần cho môn và khối này'),
+    h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return warn('Thầy cô chọn MÔN HỌC và KHỐI trước, rồi mới tải tài liệu.'); matIn.click(); } }, 'Tải tệp lên'), matIn, h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('kho') }, 'Xem / xóa tài liệu trong kho')), matMsg);
   const gameSel = h('select', { id: 'q-game', onchange: e => set('game', e.target.value, true) }, Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id, selected: Q.game === g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
   const featured = ['q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
   const featBox = h('div', { class: 'chips' }, featured.map(id => { const g = gameById(id); return h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.game === id, onclick: () => set('game', id, true) }, g.name); }));
@@ -1974,6 +1987,7 @@ function vHome() {
         h('div', { class: 'fgrid' }, f('Môn học', subSel, subOtherIn), f('Khối', gradeSel)),
         f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn),
         periodSel ? f('Tiết', periodSel) : null,
+        matRow,
         Q.subject && Q.grade && !(S.ppct[key] || []).length && !(S.matLessons[key] || []).length ? h('div', { class: 'note' }, 'Để ô Tên bài sổ ra đủ danh sách bài của ' + Q.subject + ' ' + Q.grade + ', thầy cô làm 1 trong 2 việc (một lần): ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => goHelp('kho') }, 'Tải sách giáo khoa vào kho'), h('button', { class: 'btn', onclick: () => goHelp('ppct') }, 'Tải / dán phân phối chương trình'))) : null)),
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
         h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => set('nq', clamp(+e.target.value || 10, 3, 50)) }))))),
