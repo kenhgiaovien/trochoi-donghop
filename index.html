@@ -678,7 +678,7 @@ function go(view, arg) {
 }
 function render() {
   const nav = $('#nav'); nav.innerHTML = '';
-  const studentOnly = !!S.shared;
+  const studentOnly = !!S.shared || !!S.linkError;
   if (!studentOnly) NAV.forEach(([k, l]) => nav.append(h('button', { type: 'button', 'aria-current': S.view === k ? 'page' : null, onclick: () => go(k) }, l)));
   else nav.append(h('button', { type: 'button', 'aria-current': 'page' }, 'Học sinh tham gia'));
   const lb = $('#logoBox'); lb.innerHTML = ''; lb.append(h('img', { src: S.logo || DEFAULT_LOGO, alt: 'Logo trường' }));
@@ -1380,7 +1380,7 @@ async function boot() {
   $('#brand').addEventListener('click', () => { if (!S.shared) go('home'); });
   const hash = location.hash.slice(1);
   if (hash && /^g-/.test(hash)) {
-    try { S.shared = await parseAnyCode(hash); S.view = 'join'; } catch (e) { S.view = 'home'; toast('Đường link bị thiếu hoặc lỗi — xin thầy cô gửi lại'); }
+    try { S.shared = await parseAnyCode(hash); S.view = 'join'; } catch (e) { S.view = 'join'; S.linkError = true; }
   }
   render(); renderPill();
   initCloud();
@@ -1623,14 +1623,15 @@ function openShare(p, pre) {
   async function make() {
     if (!chosen.size) return toast('Chọn ít nhất 1 trò chơi');
     if (gradeCls.length && !cls.size) return toast('Chọn lớp được giao để học sinh bấm chọn tên');
-    const pk = { id: p.id, title: p.title, subject: p.subject, grade: p.grade, lesson: p.lesson, teacher: p.teacher, nq: p.nq, time: p.time, scale: p.scale, shuffleQ: p.shuffleQ, shuffleA: p.shuffleA, feedback: p.feedback, tabWatch: p.tabWatch, tabLimit: p.tabLimit, look: p.look, due: p.due, draft: p.draft, src: p.src };
+    const pk = { id: p.id, title: p.title, subject: p.subject, grade: p.grade, lesson: p.lesson, teacher: p.teacher, nq: p.nq, time: p.time, scale: p.scale, shuffleQ: p.shuffleQ, shuffleA: p.shuffleA, feedback: p.feedback, tabWatch: p.tabWatch, tabLimit: p.tabLimit, look: p.look, due: p.due, draft: p.draft, src: srcFor(p, [...chosen]) };
     const ros = {}; cls.forEach(c => ros[c] = S.roster.classes[c].map(s => s.name));
     const code = 'g-' + await encodeObj({ v: 2, pk, games: [...chosen], mode: fb === 'end' ? 'test' : 'practice', fb, att, roster: ros, at: Date.now() });
-    const link = linkFor(code), codeEl = h('div', { class: 'code' }, link);
+    const link = linkFor(code), codeEl = h('textarea', { class: 'code', readonly: true, rows: 2, style: { minHeight: '0', resize: 'none', whiteSpace: 'nowrap', overflow: 'hidden' } }); codeEl.value = link;
     p.classes = [...cls]; p.attempts = att ? att + ' lần' : 'Nhiều lần'; savePack(p);
     out.innerHTML = '';
     out.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Đường link giao bài'), codeEl,
       h('div', { class: 'row' }, h('button', { class: 'btn primary big', onclick: () => copyText(link, codeEl) }, 'Sao chép link'), h('button', { class: 'btn', onclick: async () => { S.shared = await parseAnyCode(code); S.sharedTest = true; S.student = null; go('join'); } }, 'Mở thử như học sinh')),
+      h('p', { class: 'small ' + (link.length > 1800 ? 'note bad' : 'muted') }, 'Link dài ' + link.length.toLocaleString('vi-VN') + ' ký tự' + (link.length > 1800 ? '. Link dài dễ bị Zalo cắt cụt, học sinh mở sẽ báo lỗi. Thầy cô giảm bớt: chọn ít trò chơi hơn, hoặc giao riêng từng lớp (mỗi lớp một link).' : '. Luôn bấm nút Sao chép link, đừng bôi đen bằng tay.')),
       h('p', { class: 'small muted' }, 'Gửi link vào nhóm Zalo lớp ' + ([...cls].join(', ') || '') + '. Học sinh bấm link → chọn lớp → chọn tên → chơi. Làm xong các em gửi lại MÃ KẾT QUẢ, thầy cô dán vào mục Bảng điểm.')));
     out.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
@@ -2129,6 +2130,49 @@ document.addEventListener('paste', e => {
     toast('Đã nhận ' + q.length + ' câu hỏi. Bấm LƯU BÀI ở ngay bên dưới.');
   }, 60);
 }, true);
+
+/* ---------- LINK GIAO BÀI: gọn hơn, và link hỏng thì vẫn là màn hình học sinh ---------- */
+// Chỉ đưa vào link phần nội dung mà các trò đã chọn cần dùng
+function srcFor(p, ids) {
+  const D = parsePack(p), kinds = new Set(ids.map(id => (gameById(id) || {}).kind)), keep = new Set();
+  if (kinds.has('q')) { keep.add('q'); if (ids.includes('q15')) keep.add(D.keyword ? 'keyword' : 'words'); }
+  if (kinds.has('pairs')) { keep.add('pairs'); if (D.pairs.length < 3) { keep.add('q'); keep.add('words'); } }
+  if (kinds.has('words')) { keep.add('words'); keep.add('keyword'); }
+  if (kinds.has('seq')) keep.add('seq');
+  if (kinds.has('groups')) keep.add('groups');
+  if (kinds.has('tf')) { keep.add('tf'); if (D.tf.length < 4) { keep.add('pairs'); if (D.pairs.length < 3) { keep.add('q'); keep.add('words'); } } }
+  if (kinds.has('cloze')) { keep.add('cloze'); keep.add('words'); }
+  const out = {}; Object.keys(p.src || {}).forEach(k => out[k] = keep.has(k) ? p.src[k] : '');
+  return out;
+}
+async function copyText(text, fallbackEl) {
+  try { await navigator.clipboard.writeText(text); toast('Đã sao chép đầy đủ (' + text.length.toLocaleString('vi-VN') + ' ký tự)'); }
+  catch (e) {
+    if (fallbackEl && fallbackEl.select) { fallbackEl.focus(); fallbackEl.select(); }
+    else if (fallbackEl) { const r = document.createRange(); r.selectNodeContents(fallbackEl); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+    toast('Máy không cho sao chép tự động — nội dung đã được bôi đen, thầy cô nhấn Ctrl+C');
+  }
+}
+const __render1 = render;
+render = function () { __render1(); document.body.classList.toggle('kidbg', !!S.shared || !!S.linkError); };
+const __vJoin0 = vJoin;
+vJoin = function () {
+  if (S.shared || !S.linkError) return __vJoin0();
+  const ta = h('textarea', { id: 'joincode', placeholder: 'Dán lại toàn bộ đường link thầy cô gửi vào đây', style: { minHeight: '110px' } }), err = h('p', { class: 'small', style: { color: 'var(--bad)' } });
+  return h('div', { class: 'view kid' }, h('div', { class: 'kidhero' }, h('h1', null, 'Đường link bài tập bị thiếu'), h('p', null, 'Link thầy cô gửi rất dài nên đã bị cắt mất một đoạn khi sao chép hoặc khi gửi qua tin nhắn.')),
+    h('div', { class: 'card', style: { display: 'grid', gap: '10px', maxWidth: '680px' } },
+      h('b', null, 'Em làm theo 1 trong 2 cách:'),
+      h('div', null, '1. Mở lại tin nhắn của thầy cô, nhấn giữ vào link và chọn "Sao chép" để lấy đủ, rồi dán vào ô dưới.'),
+      h('div', null, '2. Hoặc báo thầy cô gửi lại link (thầy cô nên giao riêng từng lớp để link ngắn hơn).'),
+      ta, err,
+      h('button', { class: 'btn primary big', onclick: async () => { try { const o = await parseAnyCode(ta.value); if (o._type !== 'g') throw 0; S.shared = o; S.linkError = false; S.student = null; render(); } catch (e) { err.textContent = 'Link vẫn chưa đủ. Em sao chép lại toàn bộ link, hoặc báo thầy cô gửi lại.'; } } }, 'Vào bài')));
+};
+// Đang mở app mà bấm vào link giao bài khác thì chuyển ngay sang bài đó
+window.addEventListener('hashchange', async () => {
+  const hash = location.hash.slice(1); if (!/^g-/.test(hash)) return;
+  try { S.shared = await parseAnyCode(hash); S.linkError = false; S.sharedTest = false; } catch (e) { S.shared = null; S.linkError = true; }
+  S.student = null; go('join');
+});
 
 /* ===== 20 TRÒ CHƠI DÙNG CÂU TRẮC NGHIỆM ===== */
 const COLORS = ['#E35D4B', '#3C8DD8', '#F3B53A', '#2E9B63', '#8A55C9', '#E07BB0', '#4FB8B0', '#C98A3A'];
