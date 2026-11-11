@@ -1736,11 +1736,11 @@ function vHelp() {
     h('div', null, h('button', { class: 'btn primary', onclick: () => { S.profile = { teacher: nm.value.trim(), subject: sj.trim() }; LS.set('dh.profile', S.profile); toast('Đã lưu hồ sơ'); } }, 'Lưu hồ sơ')));
   // Kho tài liệu
   const K = { subject: S.profile.subject || '', grade: '', kind: 'Sách giáo khoa' }, klist = h('div'), kmsg = h('div', { class: 'small' });
-  const drawK = async () => { const ms = await matAll(); klist.innerHTML = ''; if (!ms.length) return klist.append(h('p', { class: 'muted small' }, 'Chưa có tài liệu nào.')); klist.append(h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tệp', 'Loại', 'Môn', 'Khối', 'Dung lượng chữ', ''].map(x => h('th', null, x)))), h('tbody', null, ms.map(x => h('tr', null, h('td', null, x.name), h('td', null, x.kind), h('td', null, x.subject || 'Mọi môn'), h('td', null, x.grade || 'Mọi khối'), h('td', { class: 'num' }, x.text.length.toLocaleString('vi-VN') + ' ký tự'), h('td', null, h('button', { class: 'btn danger', onclick: async () => { await matDel(x.id); drawK(); } }, 'Xóa')))))))); };
+  const drawK = async () => { const ms = await matAll(); klist.innerHTML = ''; if (!ms.length) return klist.append(h('p', { class: 'muted small' }, 'Chưa có tài liệu nào.')); klist.append(h('div', { class: 'scroll' }, h('table', { class: 't' }, h('thead', null, h('tr', null, ['Tệp', 'Loại', 'Môn', 'Khối', 'Dung lượng chữ', ''].map(x => h('th', null, x)))), h('tbody', null, ms.map(x => h('tr', null, h('td', null, x.name), h('td', null, x.kind), h('td', null, x.subject || 'Mọi môn'), h('td', null, x.grade || 'Mọi khối'), h('td', { class: 'num' }, (x.scan ? 'Bản scan, ' + x.pages + ' trang' : x.text.length.toLocaleString('vi-VN') + ' ký tự')), h('td', null, h('button', { class: 'btn danger', onclick: async () => { await matDel(x.id); drawK(); } }, 'Xóa')))))))); };
   const kIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md', hidden: true, onchange: async e => {
     let ok = 0; const bad = [];
-    for (const file of e.target.files) { kmsg.textContent = 'Đang đọc ' + file.name + '…'; try { const text = (await extractText(file)).replace(/\n{3,}/g, '\n\n'); if (text.replace(/\s/g, '').length < 200) throw new Error('không có chữ'); await matPut({ id: uid(), name: file.name, subject: K.subject, grade: K.grade, kind: K.kind, text: text.slice(0, 3000000), at: Date.now() }); ok++; } catch (err) { bad.push(file.name + ' (' + (err.message || 'lỗi') + ')'); } }
-    e.target.value = ''; kmsg.textContent = 'Đã lưu ' + ok + ' tệp vào kho.' + (bad.length ? ' Không đọc được: ' + bad.join('; ') + '. PDF dạng ảnh chụp/scan không có chữ nên chưa dùng được — thầy cô dùng bản PDF có chữ hoặc bản Word.' : ''); drawK();
+    for (const file of e.target.files) { kmsg.textContent = 'Đang đọc ' + file.name + '…'; try { await addToKho(file, K.subject, K.grade, K.kind); ok++; } catch (err) { bad.push(file.name + ' (' + (err.message || 'lỗi') + ')'); } }
+    e.target.value = ''; kmsg.textContent = 'Đã lưu ' + ok + ' tệp vào kho.' + (bad.length ? ' Không đọc được: ' + bad.join('; ') + '.' : ''); drawK();
   } });
   const kho = sec('kho', 'Kho tài liệu – tải lên một lần, dùng cho mọi bài', h('p', { class: 'small muted' }, 'Tải sách giáo khoa, kế hoạch bài dạy (PDF có chữ, Word, PowerPoint). Khi tạo trò chơi, app tự tìm đúng phần của bài trong kho để AI soạn, thầy cô không phải tải lại. Tài liệu lưu trên máy này.'),
     h('div', { class: 'fgrid' }, h('label', { class: 'f' }, h('span', null, 'Môn'), subjectInput('k-sub', K.subject, e => K.subject = e.target.value.trim())), h('label', { class: 'f' }, h('span', null, 'Khối'), h('select', { id: 'k-grade', onchange: e => K.grade = e.target.value }, [['', 'Mọi khối'], ['6', 'Khối 6'], ['7', 'Khối 7'], ['8', 'Khối 8'], ['9', 'Khối 9']].map(([val, n]) => h('option', { value: val }, n)))), h('label', { class: 'f' }, h('span', null, 'Loại'), h('select', { id: 'k-kind', onchange: e => K.kind = e.target.value }, ['Sách giáo khoa', 'Kế hoạch bài dạy', 'Tài liệu khác'].map(n => h('option', { value: n }, n))))),
@@ -1788,11 +1788,67 @@ function lessonsFromText(text) {
   }
   return [...out.values()];
 }
-S.matLessons = {};
+S.matLessons = {}; S.matScan = {}; S.pages = LS.get('dh.pages', {});
 async function refreshMatLessons() {
-  const map = {};
-  (await matAll()).forEach(m => { if (!m.subject || !m.grade) return; const k = ppKey(m.subject, m.grade); const ls = m.lessons || (m.lessons = lessonsFromText(m.text)); map[k] = (map[k] || []).concat(ls.filter(l => !(map[k] || []).some(x => norm(x.t) === norm(l.t)))); });
-  const changed = JSON.stringify(map) !== JSON.stringify(S.matLessons); S.matLessons = map; return changed;
+  const map = {}, scan = {};
+  (await matAll()).forEach(m => {
+    if (!m.subject || !m.grade) return; const k = ppKey(m.subject, m.grade);
+    if (m.scan) { (scan[k] = scan[k] || []).push({ name: m.name, pages: m.pages, outline: m.outline || [] }); return; }
+    const ls = m.lessons || (m.lessons = lessonsFromText(m.text)); map[k] = (map[k] || []).concat(ls.filter(l => !(map[k] || []).some(x => norm(x.t) === norm(l.t))));
+  });
+  const changed = JSON.stringify([map, scan]) !== JSON.stringify([S.matLessons, S.matScan]); S.matLessons = map; S.matScan = scan; return changed;
+}
+
+/* --- Sách PDF dạng ảnh scan: lưu cả tệp, khi tạo bài thì lấy ảnh đúng các trang của bài --- */
+async function pdfDoc(blob) {
+  await loadLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', 'pdfjsWorker');
+  const pdfjs = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'pdfjsLib');
+  return pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+}
+async function scanInfo(blob) {
+  const doc = await pdfDoc(blob), outline = [];
+  try { const ol = await doc.getOutline(); for (const it of (ol || []).flatMap(x => [x].concat(x.items || []))) { let d = it.dest; if (typeof d === 'string') d = await doc.getDestination(d); if (d && d[0]) outline.push({ t: it.title, p: (await doc.getPageIndex(d[0])) + 1 }); } } catch (e) { }
+  return { pages: doc.numPages, outline };
+}
+async function renderPages(blob, from, to, width) {
+  const doc = await pdfDoc(blob), out = [];
+  for (let p = Math.max(1, from); p <= Math.min(to, doc.numPages, from + 7); p++) {
+    const pg = await doc.getPage(p), v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: (width || 1100) / v0.width });
+    const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+    await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise; out.push(cv);
+  }
+  return out;
+}
+const parsePages = s => { const m = String(s || '').match(/(\d+)\s*(?:[-–—]|đến|den|to)?\s*(\d+)?/i); if (!m) return null; const a = +m[1], b = m[2] ? +m[2] : a; return a > 0 && b >= a ? [a, b] : null; };
+const cvBlob = (cv, type, q) => new Promise(res => cv.toBlob(res, type || 'image/jpeg', q || .82));
+async function scanImages(pk) {
+  const rg = parsePages(pk.pages); if (!rg) return [];
+  const mats = (await matAll()).filter(m => m.scan && m.blob && m.subject === pk.subject && String(m.grade) === String(pk.grade));
+  const out = [];
+  for (const m of mats.slice(0, 1)) for (const cv of await renderPages(m.blob, rg[0], rg[1])) out.push(await cvBlob(cv));
+  return out;
+}
+async function stitchImages(blobs) {
+  const bms = []; for (const b of blobs) bms.push(await createImageBitmap(b));
+  const W = 900, hs = bms.map(b => Math.round(b.height * W / b.width)), cv = document.createElement('canvas');
+  cv.width = W; cv.height = hs.reduce((a, b) => a + b, 0); const x = cv.getContext('2d'); let y = 0;
+  bms.forEach((b, i) => { x.drawImage(b, 0, y, W, hs[i]); y += hs[i]; });
+  return cv;
+}
+async function addToKho(file, subject, grade, kind) {
+  const isPdf = /\.pdf$/i.test(file.name); let text = '';
+  try { text = (await extractText(file)).replace(/\n{3,}/g, '\n\n'); } catch (e) { if (!isPdf) throw e; }
+  const rec = { id: uid(), name: file.name, subject, grade, kind, text: '', at: Date.now() };
+  if (text.replace(/\[Trang \d+\]|\s/g, '').length >= 200) rec.text = text.slice(0, 3000000);
+  else if (isPdf) { const info = await scanInfo(file); rec.scan = true; rec.blob = file; rec.pages = info.pages; rec.outline = info.outline; }
+  else throw new Error('tệp không có chữ');
+  await matPut(rec); return rec;
+}
+function guessPages(outline, lesson) {
+  const no = lessonNo(lesson), bare = norm(lesson.replace(/^\s*(bài|chủ đề|unit)\s*\d+\s*[.:\-–]?\s*/i, ''));
+  const i = (outline || []).findIndex(o => (no != null && lessonNo(o.t) === no) || (bare.length > 5 && norm(o.t).includes(bare)));
+  if (i < 0) return ''; const a = outline[i].p, nx = outline.slice(i + 1).find(o => o.p > a);
+  return a + '-' + Math.min(nx ? nx.p - 1 : a + 5, a + 7);
 }
 
 /* --- Đọc câu hỏi dán thô: "Câu 1: ...  A. ...  B. ...  Đáp án: A" --- */
@@ -1825,7 +1881,8 @@ async function runAI(pk, opt) {
   const el = opt.statusEl, say = (...k) => { el.innerHTML = ''; el.append(...k.filter(Boolean)); };
   let texts = opt.texts || '', used = [];
   if (!texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
-  const images = opt.images || [], pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
+  const images = (opt.images || []).slice(), pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
+  if (!texts.trim() && !images.length) { say(h('div', { class: 'note' }, 'Đang lấy các trang sách của bài…')); try { const sc = await scanImages(pk); sc.forEach(b => images.push(b)); if (sc.length) used.push('ảnh ' + sc.length + ' trang sách (trang ' + pk.pages + ')'); } catch (e) { } }
   const hasMat = !!(texts.trim() || images.length || pdfs.length);
   const prompt = buildPrompt(pk, opt.only, texts, hasMat);
   const finish = (o, byHand) => {
@@ -1852,6 +1909,9 @@ async function runAI(pk, opt) {
       h('div', { class: 'card', style: { display: 'grid', gap: '10px', marginTop: '8px', border: '2px solid var(--sun)' } },
         h('b', null, 'Lấy câu hỏi từ Gemini / ChatGPT (đăng nhập Gmail, không cần khóa)'),
         h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 1'), h('button', { class: 'btn primary', onclick: () => copyText(prompt, pre) }, 'Sao chép yêu cầu'), 'rồi mở', link('Gemini', 'https://gemini.google.com/app'), link('ChatGPT', 'https://chatgpt.com/'), link('Claude', 'https://claude.ai/new'), ', dán (Ctrl+V) và gửi.'),
+        images.length ? h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Thêm'), 'Bài này dùng ' + images.length + ' trang sách dạng ảnh:',
+          h('button', { class: 'btn primary', onclick: async () => { try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': stitchImages(images).then(cv => cvBlob(cv, 'image/png')) })]); toast('Đã sao chép ảnh trang sách. Sang ô chat nhấn Ctrl+V để dán ảnh, rồi mới gửi.', 5000); } catch (e) { toast('Máy không cho sao chép ảnh — thầy cô bấm "Tải ảnh về" rồi đính kèm vào ô chat', 5000); } } }, 'Sao chép ảnh trang sách'),
+          h('button', { class: 'btn', onclick: async () => saveFile('trang-sach.png', await cvBlob(await stitchImages(images), 'image/png')) }, 'Tải ảnh về'), 'và dán ảnh vào cùng ô chat trước khi gửi.') : null,
         h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 2'), 'Sao chép câu trả lời của AI, dán vào ô dưới đây:'),
         back, err,
         h('div', { class: 'row' }, h('button', { class: 'btn sun big', onclick: accept }, 'LƯU CÂU HỎI VÀ TIẾP TỤC')),
@@ -1929,17 +1989,32 @@ function vHome() {
     : h('div', { class: 'small muted' }, S.roster ? 'Chọn khối để hiện lớp.' : ['Chưa có danh sách học sinh. ', h('button', { class: 'btn', onclick: () => go('roster') }, 'Tải danh sách lên (1 lần)')]);
   // Tải tài liệu (SGK, kế hoạch bài dạy) theo đúng môn và khối đang chọn
   const matMsg = h('span', { class: 'small muted' }, 'Đang kiểm tra kho…');
-  const showMat = async () => { const ms = (await matAll()).filter(m => m.subject === Q.subject && String(m.grade) === String(Q.grade)); matMsg.textContent = !Q.subject || !Q.grade ? 'Chọn môn và khối trước khi tải.' : ms.length ? 'Đã có ' + ms.length + ' tệp cho ' + Q.subject + ' ' + Q.grade + ': ' + ms.map(m => m.name).join(', ') : 'Chưa có tài liệu nào cho ' + Q.subject + ' ' + Q.grade + '.'; };
+  const showMat = async () => { const ms = (await matAll()).filter(m => m.subject === Q.subject && String(m.grade) === String(Q.grade)); matMsg.textContent = !Q.subject || !Q.grade ? 'Chọn môn và khối trước khi tải.' : ms.length ? 'Đã có ' + ms.length + ' tệp cho ' + Q.subject + ' ' + Q.grade + ': ' + ms.map(m => m.name + (m.scan ? ' (bản scan, ' + m.pages + ' trang)' : '')).join(', ') : 'Chưa có tài liệu nào cho ' + Q.subject + ' ' + Q.grade + '.'; };
   showMat();
   const matIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md', hidden: true, onchange: async e => {
     let ok = 0; const bad = [];
-    for (const file of e.target.files) { matMsg.textContent = 'Đang đọc ' + file.name + '…'; try { const text = (await extractText(file)).replace(/\n{3,}/g, '\n\n'); if (text.replace(/\s/g, '').length < 200) throw new Error('không có chữ'); await matPut({ id: uid(), name: file.name, subject: Q.subject, grade: Q.grade, kind: /khbd|kế hoạch|ke hoach|giáo án|giao an/i.test(file.name) ? 'Kế hoạch bài dạy' : 'Sách giáo khoa', text: text.slice(0, 3000000), at: Date.now() }); ok++; } catch (err) { bad.push(file.name + ' (' + (err.message || 'lỗi') + ')'); } }
+    for (const file of e.target.files) { matMsg.textContent = 'Đang đọc ' + file.name + '… (sách lớn có thể mất một lúc)'; try { await addToKho(file, Q.subject, Q.grade, /khbd|kế hoạch|ke hoach|giáo án|giao an/i.test(file.name) ? 'Kế hoạch bài dạy' : 'Sách giáo khoa'); ok++; } catch (err) { bad.push(file.name + ' (' + (err.message || 'lỗi') + ')'); } }
     e.target.value = '';
     if (bad.length) { toast('Không đọc được: ' + bad.join('; '), 6000); await showMat(); if (ok) { await refreshMatLessons(); } }
     else { await refreshMatLessons(); toast('Đã lưu ' + ok + ' tệp vào kho ' + Q.subject + ' ' + Q.grade); render(); }
   } });
   const matRow = h('div', { class: 'f' }, h('span', null, 'Tài liệu tham khảo (SGK, kế hoạch bài dạy) – tải một lần cho môn và khối này'),
     h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return warn('Thầy cô chọn MÔN HỌC và KHỐI trước, rồi mới tải tài liệu.'); matIn.click(); } }, 'Tải tệp lên'), matIn, h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('kho') }, 'Xem / xóa tài liệu trong kho')), matMsg);
+  // Sách dạng ảnh scan: cần biết bài nằm ở trang nào của tệp PDF
+  const scans = S.matScan[key] || [], pgKey = () => key + '|' + norm(lessonName());
+  let pagesRow = null; const curPages = () => S.pages[pgKey()] || (scans[0] ? guessPages(scans[0].outline, lessonName()) : '');
+  if (scans.length) {
+    const prev = h('div', { class: 'row' });
+    const pIn = h('input', { type: 'text', id: 'q-pages', placeholder: 'VD: 30-34', value: curPages(), style: { maxWidth: '160px' }, oninput: e => { S.pages[pgKey()] = e.target.value.trim(); LS.set('dh.pages', S.pages); } });
+    pagesRow = h('div', { class: 'f' }, h('span', null, 'Bài nằm ở trang nào của tệp PDF (sách dạng ảnh scan, ' + scans[0].pages + ' trang)'),
+      h('div', { class: 'row' }, pIn, h('button', { class: 'btn', type: 'button', onclick: async () => {
+        const rg = parsePages(pIn.value); if (!rg) return warn('Nhập trang theo dạng 30-34 (số trang của tệp PDF, xem ở ô số trang của trình đọc PDF).');
+        prev.innerHTML = ''; prev.append('Đang mở trang…');
+        try { const m = (await matAll()).find(x => x.scan && x.blob && x.subject === Q.subject && String(x.grade) === String(Q.grade)); const cvs = await renderPages(m.blob, rg[0], rg[0], 260); const last = rg[1] > rg[0] ? await renderPages(m.blob, rg[1], rg[1], 260) : []; prev.innerHTML = ''; cvs.concat(last).forEach((cv, i) => { cv.style.border = '1px solid var(--line)'; cv.style.maxWidth = '45%'; prev.append(h('div', { style: { display: 'grid', gap: '4px' } }, h('span', { class: 'small muted' }, i ? 'Trang cuối: ' + rg[1] : 'Trang đầu: ' + rg[0]), cv)); }); }
+        catch (e) { prev.innerHTML = ''; prev.append('Chưa mở được trang.'); }
+      } }, 'Xem thử trang')),
+      h('span', { class: 'small muted' }, 'Sách scan không có chữ nên app gửi ảnh các trang này cho AI đọc (tối đa 8 trang). Nhập một lần cho mỗi bài, app tự nhớ.'), prev);
+  }
   const gameSel = h('select', { id: 'q-game', onchange: e => set('game', e.target.value, true) }, Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id, selected: Q.game === g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
   const featured = ['q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
   const featBox = h('div', { class: 'chips' }, featured.map(id => { const g = gameById(id); return h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.game === id, onclick: () => set('game', id, true) }, g.name); }));
@@ -1957,6 +2032,7 @@ function vHome() {
     let fresh = false;
     if (!p) { p = newPack(); fresh = true; Object.assign(p, { subject: Q.subject, grade: Q.grade, lesson, title: lesson + (Q.period !== 'Toàn bài' ? ' – ' + Q.period : ''), period: Q.period, periods: cur ? cur.n : 1, teacher: S.profile.teacher || '' }); }
     p.nq = +Q.nq || 10; if (Q.classes.length) p.classes = Q.classes.slice();
+    if (scans.length) { const pg = (v.querySelector('#q-pages') || {}).value || curPages(); if (pg) p.pages = pg; }
     if (fresh || need()) {
       v.querySelectorAll('.qgo').forEach(b => b.disabled = true);
       const ok = await runAI(p, { statusEl: status });
@@ -1987,7 +2063,7 @@ function vHome() {
         h('div', { class: 'fgrid' }, f('Môn học', subSel, subOtherIn), f('Khối', gradeSel)),
         f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn),
         periodSel ? f('Tiết', periodSel) : null,
-        matRow,
+        matRow, pagesRow,
         Q.subject && Q.grade && !(S.ppct[key] || []).length && !(S.matLessons[key] || []).length ? h('div', { class: 'note' }, 'Để ô Tên bài sổ ra đủ danh sách bài của ' + Q.subject + ' ' + Q.grade + ', thầy cô làm 1 trong 2 việc (một lần): ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => goHelp('kho') }, 'Tải sách giáo khoa vào kho'), h('button', { class: 'btn', onclick: () => goHelp('ppct') }, 'Tải / dán phân phối chương trình'))) : null)),
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
         h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => set('nq', clamp(+e.target.value || 10, 3, 50)) }))))),
