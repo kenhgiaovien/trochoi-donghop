@@ -604,7 +604,7 @@ async function extractText(file) {
     const pdfjs = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'pdfjsLib');
     const doc = await pdfjs.getDocument({ data: new Uint8Array(await readFileBuf(file)) }).promise;
     let out = '';
-    for (let i = 1; i <= doc.numPages; i++) { const pg = await doc.getPage(i); const tc = await pg.getTextContent(); out += `\n[Trang ${i}]\n` + tc.items.map(x => x.str).join(' '); }
+    for (let i = 1; i <= doc.numPages; i++) { const pg = await doc.getPage(i); const tc = await pg.getTextContent(); out += `\n[Trang ${i}]\n` + tc.items.map(x => x.str + (x.hasEOL ? String.fromCharCode(10) : " ")).join(""); }
     if (out.replace(/\[Trang \d+\]|\s/g, '').length < 20) throw new Error('PDF dạng ảnh scan — hãy chụp ảnh trang sách và tải lên dạng ảnh');
     return out;
   }
@@ -867,7 +867,7 @@ function vEditor(id) {
       fileList, pasteTa, aiBox),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Kiểm duyệt / chỉnh sửa nội dung'), regen),
       h('p', { class: 'small muted' }, 'Mỗi mục nuôi một nhóm trò chơi. Sửa trực tiếp từng dòng; sửa một câu không làm mất các câu khác.'),
-      tabsBar, hint, ta, errBox),
+      tabsBar, hint, ta, errBox, h('div', { class: 'row' }, h('button', { class: 'btn primary big', onclick: () => save('Đã duyệt') }, 'LƯU BÀI'), h('button', { class: 'btn sun big', onclick: () => { if (save('Đã duyệt')) { S.current = (orig || p).id; go('hub'); } } }, 'LƯU VÀ CHỌN TRÒ CHƠI'))),
     h('details', { class: 'adv' }, h('summary', null, 'Cài đặt nâng cao'),
       h('div', null,
         h('div', { class: 'fgrid' },
@@ -1307,8 +1307,9 @@ function vScores() {
     saveFile('bang-diem' + (fc ? '-' + fc : '') + '.csv', '\uFEFF' + lines.join('\r\n'));
   };
   v.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Kết quả'), f1, f2,
-    h('button', { class: 'btn primary', onclick: () => exportByRoster(fc, fp) }, 'Xuất Excel theo danh sách lớp'), h('button', { class: 'btn', onclick: exportCSV }, 'Xuất mọi lượt (CSV)'),
+    h('button', { class: 'btn', onclick: exportCSV }, 'Xuất mọi lượt (CSV)'),
     h('button', { class: 'btn danger', onclick: e => { if (e.target.dataset.c) { S.results = []; LS.set('dh.results', []); cloudWrite(() => cDoc('results').set({ list: [] })); render(); } else { e.target.dataset.c = 1; e.target.textContent = 'Bấm lần nữa để xóa hết'; } } }, 'Xóa bảng điểm')), tbl),
+    exportCard(() => fc, () => fp),
     h('p', { class: 'small muted' }, 'Mã kết quả có mã kiểm tra để phát hiện chỉnh sửa thông thường, nhưng không thay thế được hệ thống chấm trên máy chủ. Phù hợp luyện tập và kiểm tra thường xuyên.'));
   return v;
 }
@@ -1495,32 +1496,6 @@ async function rosterFromFile(file) {
   });
   return out;
 }
-async function exportByRoster(fc, fp) {
-  if (!S.roster) return toast('Chưa có danh sách lớp — tải lên ở mục Lớp học');
-  const rs = S.results.filter(r => !fp || r.title === fp);
-  const classes = (fc ? [fc] : [...new Set(rs.map(r => r.cls))]).filter(c => S.roster.classes[c]).sort();
-  if (!classes.length) return toast('Chưa có kết quả của lớp nào trong danh sách');
-  const titles = [...new Set(rs.map(r => r.title))];
-  const rows = [['STT', 'Họ và tên', 'Lớp'].concat(titles.length === 1 ? ['Điểm', 'Số lần làm', 'Đúng', 'Thời gian (giây)', 'Rời trang'] : titles)];
-  classes.forEach(c => S.roster.classes[c].forEach((s, i) => {
-    const row = [i + 1, s.name, c];
-    titles.forEach(t => {
-      const mine = rs.filter(r => r.cls === c && r.title === t && (r.stt ? r.stt === i + 1 : r.name === s.name));
-      const best = mine.slice().sort((a, b) => b.sc / b.max - a.sc / a.max)[0];
-      if (titles.length === 1) row.push(best ? best.sc : '', mine.length || '', best ? best.c + '/' + best.n : '', best ? best.sec : '', best ? best.tab : '');
-      else row.push(best ? best.sc : '');
-    });
-    rows.push(row);
-  }));
-  const name = 'bang-diem' + (fc ? '-' + fc : '') + '.xlsx';
-  try {
-    const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
-    const wb = XLSX.utils.book_new(), ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = [{ wch: 5 }, { wch: 28 }, { wch: 7 }].concat(rows[0].slice(3).map(() => ({ wch: 16 })));
-    XLSX.utils.book_append_sheet(wb, ws, 'Bang diem');
-    saveFile(name, new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-  } catch (e) { saveFile(name.replace('.xlsx', '.csv'), '\uFEFF' + rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\r\n')); }
-}
-
 /* --- Số lần làm của học sinh (theo máy) --- */
 function attKey() { const sh = S.shared, st = S.student; return 'dh.att.' + sh.pk.id + '.' + sh.at + '.' + st.cls + '.' + (st.stt || '') + '.' + st.name; }
 function attList() { return LS.get(attKey(), []); }
@@ -1619,126 +1594,10 @@ function applyAI(pk, o) {
   if (o.tf) pk.src.tf = A(o.tf).filter(x => x && x.s).map(x => `${String(x.s).replace(/\|/g, '/')} | ${x.v ? 'Đ' : 'S'}`).join('\n');
   if (o.cloze != null) pk.src.cloze = String(o.cloze);
 }
-/* Chạy AI cho một bài. Trả về Promise<true> khi đã có nội dung. */
-async function runAI(pk, opt) {
-  const el = opt.statusEl, say = (...k) => { el.innerHTML = ''; el.append(...k.filter(Boolean)); };
-  let texts = opt.texts || '', used = [];
-  if (!texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
-  const images = opt.images || [], pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
-  const hasMat = !!(texts.trim() || images.length || pdfs.length);
-  const prompt = buildPrompt(pk, opt.only, texts, hasMat);
-  const finish = o => {
-    if (!o || typeof o !== 'object' || Array.isArray(o)) throw { code: 'invalid_json' };
-    applyAI(pk, o);
-    if (!opt.only) { pk.draft = !hasMat; pk.status = 'Chờ duyệt'; }
-    if (opt.onDone) opt.onDone();
-    say(h('div', { class: 'note ' + (hasMat ? 'ok' : '') }, h('b', null, hasMat ? 'AI đã soạn xong. Thầy cô xem lại trước khi dùng chính thức.' : 'BẢN NHÁP THAM KHẢO – CHƯA ĐỐI CHIẾU SGK (chưa có tài liệu của bài này trong kho).'),
-      used.length ? h('div', null, 'Tài liệu đã dùng: ' + used.join(', ')) : null, (Array.isArray(o.check) ? o.check : []).slice(0, 5).map(c => h('div', null, '• ' + c))));
-  };
-  const chatUI = why => new Promise(resolve => {
-    const pre = h('textarea', { readonly: true, style: { minHeight: '70px', fontSize: '12px' } }); pre.value = prompt;
-    const back = h('textarea', { id: 'ai-paste', placeholder: 'Dán toàn bộ câu trả lời của AI vào đây', style: { minHeight: '110px' } });
-    const err = h('div', { class: 'small', style: { color: 'var(--bad)' } });
-    const link = (t, u) => h('a', { class: 'btn', href: u, target: '_blank', rel: 'noopener' }, t);
-    say(why ? h('div', { class: 'note bad' }, why) : null,
-      h('div', { class: 'card', style: { display: 'grid', gap: '10px', marginTop: '8px' } },
-        h('b', null, 'Soạn bằng Gemini / ChatGPT trên web (đăng nhập Gmail, không cần khóa, không giới hạn như API)'),
-        h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 1'), h('button', { class: 'btn primary', onclick: () => copyText(prompt, pre) }, 'Sao chép yêu cầu'), 'rồi mở:', link('Gemini', 'https://gemini.google.com/app'), link('ChatGPT', 'https://chatgpt.com/'), link('Claude', 'https://claude.ai/new')),
-        h('div', { class: 'small muted' }, 'Trong trang chat: nhấn Ctrl+V để dán rồi gửi' + (images.length || pdfs.length ? '. Thầy cô đính kèm thêm ảnh/tệp bài học vào ô chat' : '') + '. Chờ AI trả lời xong, bấm nút sao chép câu trả lời.'),
-        h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 2'), 'Dán câu trả lời vào ô dưới rồi bấm Nhận câu hỏi'),
-        back, err,
-        h('div', { class: 'row' }, h('button', { class: 'btn sun', onclick: () => { try { finish(parseLooseJSON(back.value)); resolve(true); } catch (e) { err.textContent = 'Chưa đọc được. Hãy dán toàn bộ câu trả lời (từ dấu { đầu tiên đến dấu } cuối cùng).'; } } }, 'Nhận câu hỏi')),
-        h('details', null, h('summary', { class: 'small muted' }, 'Xem nội dung yêu cầu'), pre)));
-  });
-  if (aiProvider() === 'chat') return chatUI('');
-  say(h('div', { class: 'note' }, 'AI đang đọc tài liệu và soạn câu hỏi… thường mất 30–90 giây, thầy cô đừng tải lại trang.', used.length ? h('div', null, 'Tài liệu: ' + used.join(', ')) : null));
-  try { finish(await aiJSON(prompt, { images, pdfs })); return true; }
-  catch (e) {
-    const code = e && e.code;
-    const msg = { not_granted: 'Thầy cô chưa cho phép app dùng Claude.', rate_limited: 'AI báo đã hết lượt miễn phí lúc này' + (e.message ? ' (' + String(e.message).slice(0, 140) + ')' : '') + '.', bad_key: 'Khóa API không đúng hoặc đã bị xóa — kiểm tra ở mục Cài đặt.', too_big: 'Tệp đính kèm quá lớn.', invalid_json: 'AI trả về sai định dạng.', network: e && e.message, refused: 'AI từ chối nội dung này.' }[code] || ('AI báo lỗi: ' + ((e && e.message) || code || 'không rõ'));
-    return chatUI(msg + ' Thầy cô có thể bấm lại sau, hoặc dùng ngay cách dưới đây:');
-  }
-}
 
 /* ===== core3b: màn hình Tạo nhanh, Giao bài, Học sinh, Cài đặt ===== */
 const subjectInput = (id, value, oninput) => [h('input', { type: 'text', id, list: id + '-l', value: value || '', placeholder: 'Chọn hoặc nhập môn', oninput, onchange: oninput }), h('datalist', { id: id + '-l' }, SUBJECTS.map(t => h('option', { value: t })))];
 function goHelp(id) { S.helpFocus = id; go('help'); }
-
-/* ---------- TẠO NHANH (trang đầu của giáo viên) ---------- */
-function vHome() {
-  const Q = Object.assign({ subject: S.profile.subject || '', grade: '', lesson: '', custom: '', period: 'Toàn bài', classes: [], game: 'q2', nq: 10 }, S.quick);
-  const saveQ = () => { S.quick = Q; LS.set('dh.quick', Q); };
-  const v = h('div', { class: 'view' });
-  if (!S.profile.teacher) {
-    const nm = h('input', { type: 'text', id: 'pf-name', placeholder: 'VD: Nguyễn Văn A' }); let sj = '';
-    v.append(h('div', { class: 'card setup' }, h('h2', null, 'Chào thầy cô! Nhập thông tin một lần'), h('p', { class: 'muted' }, 'Lần sau app tự nhớ, thầy cô chỉ việc chọn khối, bài và bấm tạo.'),
-      h('div', { class: 'fgrid', style: { marginTop: '12px' } }, h('label', { class: 'f' }, h('span', null, 'Họ và tên giáo viên'), nm), h('label', { class: 'f' }, h('span', null, 'Môn dạy chính'), subjectInput('pf-sub', '', e => sj = e.target.value))),
-      h('div', { style: { marginTop: '12px' } }, h('button', { class: 'btn primary big', onclick: () => { if (nm.value.trim().length < 3) return toast('Thầy cô nhập họ tên giúp em'); S.profile = { teacher: nm.value.trim(), subject: sj.trim() }; LS.set('dh.profile', S.profile); Q.subject = Q.subject || S.profile.subject; saveQ(); render(); } }, 'Lưu và bắt đầu'))));
-  }
-  const list = (S.ppct[ppKey(Q.subject, Q.grade)] || []).map(x => Object.assign({}, x));
-  S.lib.filter(p => !p.demo && p.subject === Q.subject && String(p.grade) === String(Q.grade) && p.lesson).forEach(p => { const f = list.find(l => norm(l.t) === norm(p.lesson)); if (f) f.have = true; else list.push({ t: p.lesson, n: p.periods || 1, have: true }); });
-  const custom = !list.length || Q.lesson === '__custom';
-  const cur = list.find(l => l.t === Q.lesson);
-  const lessonName = () => (custom ? Q.custom : Q.lesson || '').trim();
-  const set = (k, val, re) => { Q[k] = val; saveQ(); if (re) render(); };
-  const gradeSeg = h('div', { class: 'seg' }, [6, 7, 8, 9].map(g => h('button', { type: 'button', 'aria-pressed': String(Q.grade) === String(g), onclick: () => { Q.grade = String(g); Q.lesson = ''; Q.classes = []; Q.period = 'Toàn bài'; saveQ(); render(); } }, 'Khối ' + g)));
-  const lessonSel = list.length ? h('select', { id: 'q-lesson', onchange: e => { Q.period = 'Toàn bài'; set('lesson', e.target.value, true); } }, h('option', { value: '' }, '— Chọn bài —'), list.map(l => h('option', { value: l.t, selected: Q.lesson === l.t }, (l.have ? '✓ ' : '') + l.t)), h('option', { value: '__custom', selected: Q.lesson === '__custom' }, '✎ Tự nhập tên bài khác…')) : null;
-  const customIn = custom ? h('input', { type: 'text', id: 'q-custom', placeholder: 'Gõ tên bài, VD: Bài 7. Tìm kiếm thông tin trên Internet', value: Q.custom, oninput: e => set('custom', e.target.value) }) : null;
-  const periodSel = cur && cur.n > 1 ? h('select', { id: 'q-period', onchange: e => set('period', e.target.value) }, ['Toàn bài'].concat(Array.from({ length: cur.n }, (_, i) => 'Tiết ' + (i + 1))).map(o => h('option', { value: o, selected: Q.period === o }, o))) : null;
-  const classes = S.roster && Q.grade ? Object.keys(S.roster.classes).filter(c => c.startsWith(Q.grade)).sort() : [];
-  Q.classes = Q.classes.filter(c => classes.includes(c));
-  const classBox = classes.length ? h('div', { class: 'chips' }, classes.map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.classes.includes(c), onclick: e => { Q.classes = Q.classes.includes(c) ? Q.classes.filter(x => x !== c) : Q.classes.concat(c); saveQ(); e.currentTarget.setAttribute('aria-pressed', Q.classes.includes(c)); } }, c)))
-    : h('div', { class: 'small muted' }, S.roster ? 'Chọn khối để hiện lớp.' : ['Chưa có danh sách học sinh. ', h('button', { class: 'btn', onclick: () => go('roster') }, 'Tải danh sách lên (1 lần)')]);
-  const gameSel = h('select', { id: 'q-game', onchange: e => set('game', e.target.value) }, Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id, selected: Q.game === g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
-  const featured = ['q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
-  const featBox = h('div', { class: 'chips' }, featured.map(id => { const g = gameById(id); return h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.game === id, onclick: () => set('game', id, true) }, g.name); }));
-  const status = h('div');
-  async function quickStart(action) {
-    const g = gameById(Q.game) || GAMES[0];
-    if (g.kind === 'tool') return go('play', { game: g.id, pack: S.lib[0].id });
-    const lesson = lessonName();
-    if (!Q.subject.trim()) return toast('Chọn môn học');
-    if (!Q.grade) return toast('Chọn khối');
-    if (!lesson) return toast('Chọn hoặc nhập tên bài');
-    let p = S.lib.find(x => !x.demo && x.subject === Q.subject && String(x.grade) === String(Q.grade) && norm(x.lesson) === norm(lesson) && (x.period || 'Toàn bài') === Q.period);
-    const need = () => COUNT(parsePack(p), g.kind) < g.min;
-    let fresh = false;
-    if (!p) { p = newPack(); fresh = true; Object.assign(p, { subject: Q.subject, grade: Q.grade, lesson, title: lesson + (Q.period !== 'Toàn bài' ? ' – ' + Q.period : ''), period: Q.period, periods: cur ? cur.n : 1, teacher: S.profile.teacher || '' }); }
-    p.nq = +Q.nq || 10; if (Q.classes.length) p.classes = Q.classes.slice();
-    if (fresh || need()) {
-      v.querySelectorAll('.qgo').forEach(b => b.disabled = true);
-      const ok = await runAI(p, { statusEl: status });
-      v.querySelectorAll('.qgo').forEach(b => b.disabled = false);
-      if (!ok) return;
-    }
-    savePack(p); S.current = p.id;
-    if (need()) { toast('Bài này chưa đủ dữ liệu cho trò "' + g.name + '" — thầy cô chọn trò đang sáng'); return go('hub'); }
-    if (action === 'play') go('play', { game: g.id, pack: p.id }); else openShare(p, [g.id]);
-  }
-  const pills = h('div', { class: 'row' });
-  const pill = (txt, ok, fn) => h('button', { class: 'pill ' + (ok ? 'ok' : 'warn'), style: { border: 0, cursor: 'pointer' }, onclick: fn }, txt);
-  const matPill = pill('Kho tài liệu: …', true, () => goHelp('kho'));
-  pills.append(matPill, pill('Phân phối chương trình: ' + (Object.keys(S.ppct).length ? Object.keys(S.ppct).length + ' môn-khối' : 'chưa tải'), Object.keys(S.ppct).length > 0, () => goHelp('ppct')),
-    pill('Học sinh: ' + (S.roster ? Object.keys(S.roster.classes).length + ' lớp' : 'chưa tải'), !!S.roster, () => go('roster')), pill(aiLabel(), aiProvider() !== 'chat', () => goHelp('ai')));
-  matAll().then(ms => { matPill.textContent = 'Kho tài liệu: ' + (ms.length ? ms.length + ' tệp' : 'chưa tải'); matPill.className = 'pill ' + (ms.length ? 'ok' : 'warn'); });
-  v.append(
-    h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h1', null, 'Tạo trò chơi nhanh'), h('p', { class: 'muted' }, S.profile.teacher ? 'GV: ' + S.profile.teacher + ' · chọn bài, chọn trò, bấm tạo.' : 'Chọn bài, chọn trò, bấm tạo.')),
-      h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
-    h('div', { class: 'card quick' },
-      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '1'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Chọn bài'),
-        h('div', { class: 'fgrid' }, h('label', { class: 'f' }, h('span', null, 'Môn học'), subjectInput('q-sub', Q.subject, e => { if (e.type === 'change') set('subject', e.target.value.trim(), true); else Q.subject = e.target.value.trim(); })), h('label', { class: 'f' }, h('span', null, 'Khối'), gradeSeg)),
-        h('div', { class: 'fgrid' }, h('label', { class: 'f', style: { gridColumn: 'span 2' } }, h('span', null, 'Tên bài'), lessonSel, customIn), periodSel ? h('label', { class: 'f' }, h('span', null, 'Tiết'), periodSel) : null),
-        !list.length && Q.grade ? h('div', { class: 'small muted' }, 'Muốn chỉ việc bấm chọn bài? ', h('button', { class: 'btn', onclick: () => goHelp('ppct') }, 'Tải phân phối chương trình (1 lần)')) : null)),
-      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Chọn trò chơi'), featBox,
-        h('div', { class: 'fgrid' }, h('label', { class: 'f', style: { gridColumn: 'span 2' } }, h('span', null, 'Tất cả ' + GAMES.length + ' trò chơi và công cụ'), gameSel), h('label', { class: 'f' }, h('span', null, 'Số câu hỏi'), h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => set('nq', clamp(+e.target.value || 10, 3, 50)) }))))),
-      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '3'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Bắt đầu'),
-        h('label', { class: 'f' }, h('span', null, 'Lớp (chỉ cần khi giao bài cho học sinh)'), classBox),
-        h('div', { class: 'row' }, h('button', { class: 'btn primary big qgo', onclick: () => quickStart('play') }, '▶ Chơi trên máy chiếu'), h('button', { class: 'btn sun big qgo', onclick: () => quickStart('share') }, 'Giao bài cho học sinh')),
-        h('p', { class: 'small muted' }, 'Chơi trên máy chiếu, màn hình hiển thị theo đội; hoặc gửi link để học sinh tự làm và nộp mã kết quả. Bài đã tạo rồi sẽ mở ngay, không phải chờ AI.'), status))),
-    pills,
-    h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Bài gần đây'), h('button', { class: 'btn', onclick: () => go('editor', null) }, 'Tự soạn câu hỏi (chi tiết)')), libTable(S.lib.slice(0, 5))));
-  return v;
-}
 
 /* ---------- GIAO BÀI ---------- */
 function openShare(p, pre) {
@@ -1912,6 +1771,249 @@ function vHelp() {
 /* Lưu nháp tự động khi đang soạn bài: chuyển tab không mất thông tin */
 let __dt = 0;
 ['input', 'change', 'click'].forEach(ev => document.addEventListener(ev, () => { if (S.view === 'editor' && S.draftRef) { clearTimeout(__dt); __dt = setTimeout(() => LS.set('dh.draft', S.draftRef), 400); } }, true));
+
+/* ===== core3c: Tạo nhanh (bản 3), nhận câu hỏi dán, xuất Excel nhiều lựa chọn ===== */
+
+/* --- Danh sách bài tự rút từ sách trong Kho tài liệu --- */
+function lessonsFromText(text) {
+  const out = new Map(), re = /(?:^|[\s.])(?:Bài|BÀI)\s+(\d{1,2})\s*[.:]\s*([^\n]{4,110})/g; let m;
+  while ((m = re.exec(text)) && out.size < 150) {
+    let t = m[2].split(/\s{2,}|\s*\.{3,}|\s+(?:Bài|BÀI)\s+\d|\s+\d{1,3}(?=\s|$)/)[0].trim().replace(/[.\s…]+$/, '');
+    if (t.length < 4 || !/\p{L}{2}/u.test(t)) continue;
+    if (t === t.toUpperCase()) t = t[0] + t.slice(1).toLowerCase();
+    const key = m[1] + '|' + norm(t); if (!out.has(key)) out.set(key, { t: 'Bài ' + m[1] + '. ' + t, n: 1 });
+  }
+  return [...out.values()];
+}
+S.matLessons = {};
+async function refreshMatLessons() {
+  const map = {};
+  (await matAll()).forEach(m => { if (!m.subject || !m.grade) return; const k = ppKey(m.subject, m.grade); const ls = m.lessons || (m.lessons = lessonsFromText(m.text)); map[k] = (map[k] || []).concat(ls.filter(l => !(map[k] || []).some(x => norm(x.t) === norm(l.t)))); });
+  const changed = JSON.stringify(map) !== JSON.stringify(S.matLessons); S.matLessons = map; return changed;
+}
+
+/* --- Đọc câu hỏi dán thô: "Câu 1: ...  A. ...  B. ...  Đáp án: A" --- */
+function parsePlainQuiz(text) {
+  const blocks = ('\n' + String(text).replace(/\r/g, '')).split(/\n(?=\s*(?:\*\*)?(?:Câu|Question)\s*\d+\s*[.:)])|\n(?=\s*\d+\s*[.)]\s+\S)/i), out = [];
+  for (const b of blocks) {
+    const lines = b.split('\n').map(s => s.replace(/\*\*/g, '').trim()).filter(Boolean); if (lines.length < 3) continue;
+    let q = '', ex = ''; const opts = []; let ans = [];
+    for (const ln of lines) {
+      let m;
+      if ((m = ln.match(/^(?:đáp án đúng|đáp án|answer|đ\/a)\s*[:\-–]?\s*(.+)$/i))) { const lead = (m[1].match(/^\s*([A-H](?:\s*(?:,|;|và)\s*[A-H])*)(?![a-zà-ỹ])/) || [])[1] || ''; (lead.match(/[A-H]/g) || []).forEach(ch => ans.push(ch.charCodeAt(0) - 65)); const rest = m[1].slice(lead.length).replace(/^[\s.,;:\-–]+/, ''); if (rest.length > 3) ex = rest; }
+      else if ((m = ln.match(/^(\*?)\s*([A-Ha-h])\s*[.)]\s*(.+)$/))) { if (m[1] || /\*\s*$/.test(m[3])) ans.push(opts.length); opts.push(m[3].replace(/\*\s*$/, '').trim()); }
+      else if ((m = ln.match(/^(?:giải thích|lời giải)\s*[:\-–]\s*(.+)$/i))) ex = m[1];
+      else if (!opts.length) q += (q ? ' ' : '') + ln.replace(/^(?:Câu|Question)?\s*\d+\s*[.:)]\s*/i, '');
+    }
+    ans = [...new Set(ans)].filter(i => i < opts.length);
+    if (q && opts.length >= 2 && ans.length) out.push({ q, options: opts, correct: ans, explain: ex });
+  }
+  return out;
+}
+function readPasted(text) {
+  try { const o = parseLooseJSON(text); if (o && typeof o === 'object' && !Array.isArray(o)) return o; if (Array.isArray(o) && o.length && o[0].q) return { q: o }; } catch (e) { }
+  const q = parsePlainQuiz(text); if (q.length) return { q };
+  const p = parseQ(text); if (p.list.length) return { q: p.list.map(x => ({ q: x.q, options: x.opts, correct: x.ans, explain: x.ex })) };
+  return null;
+}
+
+/* --- Chạy AI cho một bài. Trả về Promise<true> khi đã có nội dung. --- */
+async function runAI(pk, opt) {
+  const el = opt.statusEl, say = (...k) => { el.innerHTML = ''; el.append(...k.filter(Boolean)); };
+  let texts = opt.texts || '', used = [];
+  if (!texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
+  const images = opt.images || [], pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
+  const hasMat = !!(texts.trim() || images.length || pdfs.length);
+  const prompt = buildPrompt(pk, opt.only, texts, hasMat);
+  const finish = (o, byHand) => {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw { code: 'invalid_json' };
+    applyAI(pk, o);
+    if (!opt.only) { pk.draft = !hasMat && !byHand; pk.status = byHand ? 'Đã duyệt' : 'Chờ duyệt'; }
+    if (opt.onDone) opt.onDone();
+    say(h('div', { class: 'note ok' }, h('b', null, 'Đã lưu ' + parsePack(pk).q.length + ' câu hỏi vào bài. '), pk.draft ? 'BẢN NHÁP THAM KHẢO – CHƯA ĐỐI CHIẾU SGK (chưa có tài liệu của bài này trong kho).' : 'Thầy cô xem lại trước khi dùng chính thức.',
+      used.length ? h('div', null, 'Tài liệu đã dùng: ' + used.join(', ')) : null, (Array.isArray(o.check) ? o.check : []).slice(0, 5).map(c => h('div', null, '• ' + c))));
+  };
+  const chatUI = why => new Promise(resolve => {
+    const pre = h('textarea', { readonly: true, style: { minHeight: '70px', fontSize: '12px' } }); pre.value = prompt;
+    const back = h('textarea', { id: 'ai-paste', placeholder: 'Dán câu trả lời của AI vào đây.\nCũng có thể dán câu hỏi thầy cô đã có sẵn, dạng:\nCâu 1: …\nA. …\nB. …\nC. …\nD. …\nĐáp án: A', style: { minHeight: '150px' } });
+    const err = h('div', { class: 'note bad', hidden: true });
+    const link = (t, u) => h('a', { class: 'btn', href: u, target: '_blank', rel: 'noopener' }, t);
+    const accept = () => {
+      if (!back.value.trim()) { err.hidden = false; err.textContent = 'Ô đang trống. Thầy cô dán câu trả lời của AI (hoặc câu hỏi có sẵn) vào rồi bấm lại.'; return; }
+      const o = readPasted(back.value);
+      if (!o) { err.hidden = false; err.textContent = 'Chưa đọc được câu hỏi nào. Mỗi câu cần có dòng "Câu 1: …", các dòng "A. …", "B. …" và dòng "Đáp án: A".'; return; }
+      try { finish(o, !o.check); resolve(true); } catch (e) { err.hidden = false; err.textContent = 'Chưa đọc được nội dung đã dán.'; }
+    };
+    back.addEventListener('paste', () => setTimeout(() => { if (readPasted(back.value)) accept(); }, 60));
+    say(why ? h('div', { class: 'note bad' }, why) : null,
+      h('div', { class: 'card', style: { display: 'grid', gap: '10px', marginTop: '8px', border: '2px solid var(--sun)' } },
+        h('b', null, 'Lấy câu hỏi từ Gemini / ChatGPT (đăng nhập Gmail, không cần khóa)'),
+        h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 1'), h('button', { class: 'btn primary', onclick: () => copyText(prompt, pre) }, 'Sao chép yêu cầu'), 'rồi mở', link('Gemini', 'https://gemini.google.com/app'), link('ChatGPT', 'https://chatgpt.com/'), link('Claude', 'https://claude.ai/new'), ', dán (Ctrl+V) và gửi.'),
+        h('div', { class: 'row' }, h('span', { class: 'pill plain' }, 'Bước 2'), 'Sao chép câu trả lời của AI, dán vào ô dưới đây:'),
+        back, err,
+        h('div', { class: 'row' }, h('button', { class: 'btn sun big', onclick: accept }, 'LƯU CÂU HỎI VÀ TIẾP TỤC')),
+        h('details', null, h('summary', { class: 'small muted' }, 'Xem nội dung yêu cầu'), pre)));
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  if (aiProvider() === 'chat') return chatUI('');
+  say(h('div', { class: 'note' }, 'AI đang đọc tài liệu và soạn câu hỏi… thường mất 30–90 giây, thầy cô đừng tải lại trang.', used.length ? h('div', null, 'Tài liệu: ' + used.join(', ')) : null));
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try { finish(await aiJSON(prompt, { images, pdfs })); return true; }
+  catch (e) {
+    const code = e && e.code;
+    const msg = { not_granted: 'Thầy cô chưa cho phép app dùng Claude.', rate_limited: 'AI tự động đang hết lượt miễn phí.', bad_key: 'Khóa API không đúng hoặc đã bị xóa (xem mục Cài đặt).', too_big: 'Tệp đính kèm quá lớn.', invalid_json: 'AI trả về sai định dạng.', network: e && e.message, refused: 'AI từ chối nội dung này.' }[code] || ('AI báo lỗi: ' + ((e && e.message) || code || 'không rõ'));
+    return chatUI(msg + ' Thầy cô làm theo 2 bước dưới đây là có câu hỏi ngay:');
+  }
+}
+
+/* ---------- TẠO NHANH ---------- */
+function vHome() {
+  const Q = Object.assign({ subject: S.profile.subject || '', grade: '', lesson: '', custom: '', period: 'Toàn bài', classes: [], game: 'q2', nq: 10 }, S.quick);
+  const saveQ = () => { S.quick = Q; LS.set('dh.quick', Q); };
+  const v = h('div', { class: 'view' });
+  if (!S.profile.teacher) {
+    const nm = h('input', { type: 'text', id: 'pf-name', placeholder: 'VD: Nguyễn Văn A' });
+    const sjSel = h('select', { id: 'pf-sub' }, h('option', { value: '' }, '— Chọn môn —'), SUBJECTS.map(t => h('option', { value: t }, t)));
+    v.append(h('div', { class: 'card setup' }, h('h2', null, 'Chào thầy cô! Nhập thông tin một lần'), h('p', { class: 'muted' }, 'Lần sau app tự nhớ, thầy cô chỉ việc chọn khối, bài và bấm tạo.'),
+      h('div', { class: 'fgrid', style: { marginTop: '12px' } }, h('label', { class: 'f' }, h('span', null, 'Họ và tên giáo viên'), nm), h('label', { class: 'f' }, h('span', null, 'Môn dạy chính'), sjSel)),
+      h('div', { style: { marginTop: '12px' } }, h('button', { class: 'btn primary big', onclick: () => { if (nm.value.trim().length < 3) return toast('Thầy cô nhập họ tên giúp em'); S.profile = { teacher: nm.value.trim(), subject: sjSel.value }; LS.set('dh.profile', S.profile); Q.subject = Q.subject || S.profile.subject; saveQ(); render(); } }, 'Lưu và bắt đầu'))));
+  }
+  // danh sách bài: phân phối chương trình + sách trong kho + bài đã soạn
+  const key = ppKey(Q.subject, Q.grade);
+  const list = (S.ppct[key] || []).map(x => Object.assign({}, x));
+  (S.matLessons[key] || []).forEach(l => { if (!list.some(x => norm(x.t) === norm(l.t))) list.push(Object.assign({}, l)); });
+  S.lib.filter(p => !p.demo && p.subject === Q.subject && String(p.grade) === String(Q.grade) && p.lesson).forEach(p => { const f = list.find(l => norm(l.t) === norm(p.lesson)); if (f) f.have = true; else list.push({ t: p.lesson, n: p.periods || 1, have: true }); });
+  refreshMatLessons().then(ch => { if (ch && S.view === 'home' && !v.querySelector('#ai-paste')) render(); });
+  if (Q.lesson && Q.lesson !== '__custom' && !list.some(l => l.t === Q.lesson)) Q.lesson = '';
+  const custom = Q.lesson === '__custom' || (!list.length && !!Q.grade && !!Q.subject);
+  const cur = list.find(l => l.t === Q.lesson);
+  const lessonName = () => (custom ? Q.custom : Q.lesson || '').trim();
+  const set = (k, val, re) => { Q[k] = val; saveQ(); if (re) render(); };
+  const subs = SUBJECTS.slice(); if (Q.subject && !subs.includes(Q.subject)) subs.unshift(Q.subject);
+  const subSel = h('select', { id: 'q-sub', onchange: e => { Q.lesson = ''; Q.period = 'Toàn bài'; set('subject', e.target.value, true); } }, h('option', { value: '' }, '— Chọn môn —'), subs.map(t => h('option', { value: t, selected: Q.subject === t }, t)));
+  const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.lesson = ''; Q.classes = []; Q.period = 'Toàn bài'; saveQ(); render(); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
+  const lessonSel = h('select', { id: 'q-lesson', onchange: e => { Q.period = 'Toàn bài'; set('lesson', e.target.value, true); } },
+    h('option', { value: '' }, !Q.subject || !Q.grade ? '— Chọn môn và khối trước —' : list.length ? '— Bấm để chọn bài (' + list.length + ' bài) —' : '— Chưa có danh sách bài của môn này —'),
+    list.map(l => h('option', { value: l.t, selected: Q.lesson === l.t }, (l.have ? '✓ ' : '') + l.t)),
+    h('option', { value: '__custom', selected: Q.lesson === '__custom' }, '✎ Gõ tên bài khác…'));
+  const customIn = custom ? h('input', { type: 'text', id: 'q-custom', placeholder: 'Gõ tên bài, VD: Bài 7. Tìm kiếm thông tin trên Internet', value: Q.custom, oninput: e => set('custom', e.target.value) }) : null;
+  const periodSel = cur && cur.n > 1 ? h('select', { id: 'q-period', onchange: e => set('period', e.target.value) }, ['Toàn bài'].concat(Array.from({ length: cur.n }, (_, i) => 'Tiết ' + (i + 1))).map(o => h('option', { value: o, selected: Q.period === o }, o))) : null;
+  const classes = S.roster && Q.grade ? Object.keys(S.roster.classes).filter(c => c.startsWith(Q.grade)).sort() : [];
+  Q.classes = Q.classes.filter(c => classes.includes(c));
+  const classBox = classes.length ? h('div', { class: 'chips' }, classes.map(c => h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.classes.includes(c), onclick: e => { Q.classes = Q.classes.includes(c) ? Q.classes.filter(x => x !== c) : Q.classes.concat(c); saveQ(); e.currentTarget.setAttribute('aria-pressed', Q.classes.includes(c)); } }, c)))
+    : h('div', { class: 'small muted' }, S.roster ? 'Chọn khối để hiện lớp.' : ['Chưa có danh sách học sinh. ', h('button', { class: 'btn', onclick: () => go('roster') }, 'Tải danh sách lên (1 lần)')]);
+  const gameSel = h('select', { id: 'q-game', onchange: e => set('game', e.target.value, true) }, Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id, selected: Q.game === g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
+  const featured = ['q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
+  const featBox = h('div', { class: 'chips' }, featured.map(id => { const g = gameById(id); return h('button', { type: 'button', class: 'chip', 'aria-pressed': Q.game === id, onclick: () => set('game', id, true) }, g.name); }));
+  const status = h('div');
+  const warn = t => { status.innerHTML = ''; status.append(h('div', { class: 'note bad' }, t)); status.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+  async function quickStart(action) {
+    const g = gameById(Q.game) || GAMES[0];
+    if (g.kind === 'tool') return go('play', { game: g.id, pack: S.lib[0].id });
+    const lesson = lessonName();
+    if (!Q.subject) return warn('Thầy cô chưa chọn MÔN HỌC ở bước 1.');
+    if (!Q.grade) return warn('Thầy cô chưa chọn KHỐI ở bước 1.');
+    if (!lesson) return warn('Thầy cô chưa chọn TÊN BÀI ở bước 1 (bấm vào ô Tên bài để chọn, hoặc chọn "Gõ tên bài khác").');
+    let p = S.lib.find(x => !x.demo && x.subject === Q.subject && String(x.grade) === String(Q.grade) && norm(x.lesson) === norm(lesson) && (x.period || 'Toàn bài') === Q.period);
+    const need = () => COUNT(parsePack(p), g.kind) < g.min;
+    let fresh = false;
+    if (!p) { p = newPack(); fresh = true; Object.assign(p, { subject: Q.subject, grade: Q.grade, lesson, title: lesson + (Q.period !== 'Toàn bài' ? ' – ' + Q.period : ''), period: Q.period, periods: cur ? cur.n : 1, teacher: S.profile.teacher || '' }); }
+    p.nq = +Q.nq || 10; if (Q.classes.length) p.classes = Q.classes.slice();
+    if (fresh || need()) {
+      v.querySelectorAll('.qgo').forEach(b => b.disabled = true);
+      const ok = await runAI(p, { statusEl: status });
+      v.querySelectorAll('.qgo').forEach(b => b.disabled = false);
+      if (!ok) return;
+    }
+    savePack(p); S.current = p.id;
+    if (need()) {
+      const D = parsePack(p), can = GAMES.filter(x => x.kind !== 'tool' && COUNT(D, x.kind) >= x.min);
+      if (!can.length) return warn('Bài chưa có câu hỏi nào nên chưa chơi được. Thầy cô bấm lại nút và dán câu hỏi vào.');
+      status.innerHTML = ''; status.append(h('div', { class: 'note' }, 'Đã lưu bài. Trò "' + g.name + '" cần loại dữ liệu khác (' + KIND_SRC[g.kind] + '), bài này hiện chơi được ' + can.length + ' trò. ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => go('play', { game: can[0].id, pack: p.id }) }, '▶ Chơi "' + can[0].name + '"'), h('button', { class: 'btn', onclick: () => go('hub') }, 'Xem các trò chơi được'))));
+      return;
+    }
+    if (action === 'play') go('play', { game: g.id, pack: p.id }); else openShare(p, [g.id]);
+  }
+  const pills = h('div', { class: 'row' });
+  const pill = (txt, ok, fn) => h('button', { class: 'pill ' + (ok ? 'ok' : 'warn'), style: { border: 0, cursor: 'pointer' }, onclick: fn }, txt);
+  const matPill = pill('Kho tài liệu: …', true, () => goHelp('kho'));
+  pills.append(matPill, pill('Phân phối chương trình: ' + (Object.keys(S.ppct).length ? Object.keys(S.ppct).length + ' môn-khối' : 'chưa tải'), Object.keys(S.ppct).length > 0, () => goHelp('ppct')),
+    pill('Học sinh: ' + (S.roster ? Object.keys(S.roster.classes).length + ' lớp' : 'chưa tải'), !!S.roster, () => go('roster')), pill(aiLabel(), aiProvider() !== 'chat', () => goHelp('ai')));
+  matAll().then(ms => { matPill.textContent = 'Kho tài liệu: ' + (ms.length ? ms.length + ' tệp' : 'chưa tải'); matPill.className = 'pill ' + (ms.length ? 'ok' : 'warn'); });
+  const f = (label, ...el) => h('label', { class: 'f' }, h('span', null, label), ...el);
+  v.append(
+    h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h1', null, 'Tạo trò chơi nhanh'), h('p', { class: 'muted' }, S.profile.teacher ? 'GV: ' + S.profile.teacher + ' · chọn bài, chọn trò, bấm chơi.' : 'Chọn bài, chọn trò, bấm chơi.')),
+      h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
+    h('div', { class: 'card quick' },
+      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '1'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn bài'),
+        h('div', { class: 'fgrid' }, f('Môn học', subSel), f('Khối', gradeSel)),
+        f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn),
+        periodSel ? f('Tiết', periodSel) : null,
+        Q.subject && Q.grade && !(S.ppct[key] || []).length && !(S.matLessons[key] || []).length ? h('div', { class: 'note' }, 'Để ô Tên bài sổ ra đủ danh sách bài của ' + Q.subject + ' ' + Q.grade + ', thầy cô làm 1 trong 2 việc (một lần): ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => goHelp('kho') }, 'Tải sách giáo khoa vào kho'), h('button', { class: 'btn', onclick: () => goHelp('ppct') }, 'Tải / dán phân phối chương trình'))) : null)),
+      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
+        h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => set('nq', clamp(+e.target.value || 10, 3, 50)) }))))),
+      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '3'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Bắt đầu'),
+        f('Lớp (chỉ cần khi giao bài cho học sinh)', classBox),
+        h('div', { class: 'row' }, h('button', { class: 'btn primary big qgo', onclick: () => quickStart('play') }, '▶ Chơi trên máy chiếu'), h('button', { class: 'btn sun big qgo', onclick: () => quickStart('share') }, 'Giao bài cho học sinh')),
+        h('p', { class: 'small muted' }, 'Chơi trên máy chiếu, màn hình hiển thị theo đội; hoặc gửi link để học sinh tự làm và nộp mã kết quả. Bài đã có câu hỏi sẽ mở ngay.'), status))),
+    pills,
+    h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Bài đã lưu – bấm Chơi để chơi lại ngay'), h('button', { class: 'btn', onclick: () => go('editor', null) }, 'Tự soạn / dán câu hỏi')), libTable(S.lib.slice(0, 6))));
+  return v;
+}
+
+/* ---------- XUẤT EXCEL: lớp / khối / cả trường ---------- */
+async function exportByRoster(scope, fp) {
+  const rs = S.results.filter(r => !fp || r.title === fp);
+  const all = S.roster ? Object.keys(S.roster.classes) : [...new Set(rs.map(r => r.cls))];
+  const classes = (scope.cls ? [scope.cls] : scope.grade ? all.filter(c => c.startsWith(scope.grade)) : all).filter(c => scope.cls || !S.roster || rs.some(r => r.cls === c) || scope.grade).sort();
+  if (!classes.length) return toast('Chưa có lớp nào để xuất');
+  const titles = [...new Set(rs.filter(r => classes.includes(r.cls)).map(r => r.title))];
+  const one = titles.length === 1;
+  const head = ['STT', 'Họ và tên', 'Lớp'].concat(one ? ['Điểm', 'Số lần làm', 'Số câu đúng', 'Thời gian (giây)', 'Rời trang', 'Nộp lúc'] : titles.length ? titles : ['Điểm']);
+  const rowsOf = c => {
+    const names = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [...new Set(rs.filter(r => r.cls === c).map(r => r.name))];
+    return names.map((name, i) => {
+      const row = [i + 1, name, c];
+      (titles.length ? titles : [null]).forEach(t => {
+        const mine = rs.filter(r => r.cls === c && (!t || r.title === t) && (r.stt && S.roster ? r.stt === i + 1 : r.name === name));
+        const best = mine.slice().sort((a, b) => b.sc / b.max - a.sc / a.max)[0];
+        if (one) row.push(best ? best.sc : '', mine.length || '', best ? best.c + '/' + best.n : '', best ? best.sec : '', best ? best.tab : '', best ? fmtDate(best.at) : ''); else row.push(best ? best.sc : '');
+      });
+      return row;
+    });
+  };
+  const sheets = classes.map(c => [c, [head].concat(rowsOf(c))]);
+  const name = 'bang-diem-' + (scope.cls || (scope.grade ? 'khoi-' + scope.grade : 'ca-truong')) + '.xlsx';
+  try {
+    const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
+    const wb = XLSX.utils.book_new(), cols = [{ wch: 5 }, { wch: 28 }, { wch: 7 }].concat(head.slice(3).map(() => ({ wch: 16 })));
+    const add = (n, rows) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = cols; XLSX.utils.book_append_sheet(wb, ws, n.slice(0, 28)); };
+    if (sheets.length > 1) add('Tong hop', [head].concat(...sheets.map(s => s[1].slice(1))));
+    sheets.forEach(([c, rows]) => add(c, rows));
+    await saveFile(name, new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) { saveFile(name.replace('.xlsx', '.csv'), '﻿' + [head].concat(...sheets.map(s => s[1].slice(1))).map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\r\n')); }
+}
+function exportCard(getCls, getTitle) {
+  const all = S.roster ? Object.keys(S.roster.classes).sort() : [...new Set(S.results.map(r => r.cls))].sort();
+  const grades = [...new Set(all.map(c => c[0]))].sort();
+  const clsSel = h('select', { id: 'ex-cls', style: { maxWidth: '170px' } }, h('option', { value: '' }, '— Chọn lớp —'), all.map(c => h('option', { value: c, selected: getCls() === c }, c)));
+  const b = (label, scope, cls) => h('button', { class: 'btn ' + (cls || ''), onclick: () => exportByRoster(scope(), getTitle()) }, label);
+  return h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Xuất Excel – bấm là tải về'),
+    h('p', { class: 'small muted' }, 'Tệp xuất đúng thứ tự danh sách lớp đã tải lên, kèm điểm cao nhất và số lần làm. Xuất khối hoặc cả trường thì mỗi lớp một trang tính, thêm trang Tổng hợp. Đang lọc theo bài nào ở trên thì xuất theo bài đó.'),
+    h('div', { class: 'row' }, clsSel, h('button', { class: 'btn primary', onclick: () => clsSel.value ? exportByRoster({ cls: clsSel.value }, getTitle()) : toast('Chọn lớp cần xuất') }, 'Xuất lớp này'),
+      grades.map(g => b('Xuất khối ' + g, () => ({ grade: g }))), b('Xuất cả trường', () => ({}), 'sun')));
+}
+
+/* --- Trang soạn bài: dán câu hỏi thô vào thẻ Trắc nghiệm thì tự chuyển đúng định dạng --- */
+document.addEventListener('paste', e => {
+  const ta = e.target; if (!ta || ta.id !== 'f-src' || S.view !== 'editor') return;
+  setTimeout(() => {
+    if (ta.value.includes('|')) return;
+    const q = parsePlainQuiz(ta.value); if (!q.length) return;
+    const tmp = { src: {} }; applyAI(tmp, { q }); ta.value = tmp.src.q; ta.dispatchEvent(new Event('input', { bubbles: true }));
+    toast('Đã nhận ' + q.length + ' câu hỏi. Bấm LƯU BÀI ở ngay bên dưới.');
+  }, 60);
+}, true);
 
 /* ===== 20 TRÒ CHƠI DÙNG CÂU TRẮC NGHIỆM ===== */
 const COLORS = ['#E35D4B', '#3C8DD8', '#F3B53A', '#2E9B63', '#8A55C9', '#E07BB0', '#4FB8B0', '#C98A3A'];
