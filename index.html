@@ -159,6 +159,18 @@ table.t td.num{font-variant-numeric:tabular-nums;text-align:right}
 .tile.okc::after{content:" ✓";font-weight:800}
 .tile.badc::after{content:" ✗";font-weight:800}
 .ferr{color:var(--bad);font-weight:600;font-size:13.5px}
+.ferr:empty{display:none}
+/* Biểu mẫu soạn từng câu */
+.qform{display:grid;gap:12px}
+.qitem{display:grid;gap:8px;border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--paper)}
+.qitem textarea{min-height:58px;font-family:var(--f-body);font-size:15px;background:var(--card)}
+.qitem input[type=text]{background:var(--card)}
+.qopt{display:grid;grid-template-columns:auto 22px minmax(0,1fr) auto;gap:8px;align-items:center;border-radius:10px;padding:2px 4px}
+.qopt.isok{background:color-mix(in srgb,var(--ok) 16%,transparent)}
+.qopt.isok input[type=text]{border-color:var(--ok);font-weight:600}
+.okbox{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.okbox input{width:20px;height:20px}
+@media (max-width:600px){.qopt{grid-template-columns:auto minmax(0,1fr) auto}.qopt>b{display:none}}
 .startcard{display:grid;gap:14px;border:2px solid var(--accent)}
 .startcard .big3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .startcard .big3 .btn{min-height:56px;font-size:16px}
@@ -2229,7 +2241,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.15-2248';
+const BUILD = '2026.11.15-2253';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2615,6 +2627,103 @@ async function checkUpdate(manual) {
   if (!document.getElementById('updbar')) document.body.prepend(h('div', { id: 'updbar' }, 'Đã có bản mới của app. ', h('button', { class: 'btn', onclick: apply }, 'Cập nhật ngay'), h('span', { class: 'small' }, ' (đang chơi hoặc đang soạn thì bấm sau cũng được)')));
 }
 if (IS_WEB) { setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
+
+/* ===== Biểu mẫu soạn từng câu trắc nghiệm (trang Tạo trò chơi) =====
+   Dữ liệu vẫn lưu ở dạng chữ như cũ:  Câu hỏi | *Đúng | Sai // Giải thích {NB}
+   nên mọi trò chơi, link đã giao và mục "Nhập nhanh nhiều câu" không thay đổi. */
+const LEVELS = { NB: 'Nhận biết', TH: 'Thông hiểu', VD: 'Vận dụng' };
+const levelOf = s => { s = String(s || ''); return /nhận biết|^nb$/i.test(s.trim()) ? 'NB' : /thông hiểu|^th$/i.test(s.trim()) ? 'TH' : /vận dụng|^vd$/i.test(s.trim()) ? 'VD' : ''; };
+function maskMath(s) { const st = []; return [String(s).replace(MATH_RE, m => { st.push(m); return '' + (st.length - 1) + ''; }), x => String(x).replace(/(\d+)/g, (_, i) => st[+i])]; }
+
+// Mức độ nằm cuối phần giải thích, trong ngoặc nhọn; tách ra để không hiện trong trò chơi
+const __parseQ0 = parseQ;
+parseQ = function (t) {
+  const r = __parseQ0(t);
+  r.list.forEach(q => { const m = String(q.ex || '').match(/\s*\{(NB|TH|VD)\}\s*$/); if (m) { q.lv = m[1]; q.ex = q.ex.slice(0, m.index).trim(); } });
+  return r;
+};
+// Giữ lại mức độ AI đề xuất cho từng câu
+const __applyAI1 = applyAI;
+applyAI = function (pk, o) {
+  if (o && Array.isArray(o.q)) o = Object.assign({}, o, { q: o.q.map(x => { const lv = x && levelOf(x.level); return lv ? Object.assign({}, x, { explain: (x.explain || '') + ' {' + lv + '}' }) : x; }) });
+  __applyAI1(pk, o);
+};
+
+function attachQForm(v) {
+  const ta = v.querySelector('#f-src'), bar = v.querySelector('.tabsbar'); if (!ta || !bar) return;
+  const hint = bar.nextElementSibling;
+  let mode = LS.get('dh.qmode', 'form'), last = null, items = [];
+  const form = h('div', { class: 'qform' }), stat = h('div', { class: 'small' });
+  const modeSeg = h('div', { class: 'seg' }, [['form', 'Soạn từng câu'], ['bulk', 'Nhập nhanh nhiều câu']].map(([k, label]) => h('button', { type: 'button', 'data-m': k, 'aria-pressed': mode === k, onclick: () => { mode = k; LS.set('dh.qmode', k); modeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === k)); last = null; sync(); } }, label)));
+  const wrap = h('div', { style: { display: 'grid', gap: '10px' } }, h('div', { class: 'row' }, modeSeg, stat), form);
+  ta.before(wrap);
+  const isQ = () => { const b = bar.querySelector('button[aria-pressed="true"]'); return !!b && b.textContent.startsWith('Trắc nghiệm'); };
+  const clean = s => { const [m, back] = maskMath(String(s).replace(/\s*\n\s*/g, ' ').trim()); return back(m.replace(/\|/g, '/').replace(/\/\//g, '/ /')); };
+  const serialize = () => items.filter(it => it.q.trim() || it.opts.some(o => o.t.trim())).map(it => clean(it.q) + ' | ' + it.opts.filter(o => o.t.trim()).map(o => (o.ok ? '*' : '') + clean(o.t).replace(/^\*+/, '')).join(' | ') + (it.ex.trim() || it.lv ? ' // ' + clean(it.ex) + (it.lv ? ' {' + it.lv + '}' : '') : '')).join('\n');
+  const problems = it => {
+    const os = it.opts.filter(o => o.t.trim()), out = [];
+    if (!it.q.trim()) out.push('chưa có nội dung câu hỏi');
+    if (os.length < 2) out.push('cần ít nhất 2 phương án');
+    if (!os.some(o => o.ok)) out.push('chưa đánh dấu đáp án đúng');
+    if (new Set(os.map(o => norm(o.t))).size < os.length) out.push('có phương án trùng nhau');
+    return out;
+  };
+  const stats = () => {
+    const n = items.length, c = k => items.filter(it => it.lv === k).length, bad = items.filter(it => problems(it).length).length;
+    stat.innerHTML = ''; stat.append(n + ' câu · Nhận biết ' + c('NB') + ' · Thông hiểu ' + c('TH') + ' · Vận dụng ' + c('VD') + (c('') ? ' · chưa gắn mức độ ' + c('') : ''), bad ? h('b', { style: { color: 'var(--bad)' } }, ' · ' + bad + ' câu cần sửa') : h('b', { style: { color: 'var(--ok)' } }, n ? ' · không có lỗi' : ''));
+  };
+  const push = () => { last = serialize(); ta.value = last; ta.dispatchEvent(new Event('input', { bubbles: true })); stats(); };
+  const blank = () => ({ q: '', opts: [{ t: '', ok: false }, { t: '', ok: false }, { t: '', ok: false }, { t: '', ok: false }], ex: '', lv: '' });
+  const load = () => {
+    items = ta.value.split('\n').map(l => l.trim()).filter(Boolean).map(line => {
+      const [m, back] = maskMath(line); let body = m, tail = ''; const k = m.indexOf('//'); if (k >= 0) { tail = m.slice(k + 2).trim(); body = m.slice(0, k); }
+      let lv = ''; const lm = tail.match(/\s*\{(NB|TH|VD)\}\s*$/); if (lm) { lv = lm[1]; tail = tail.slice(0, lm.index).trim(); }
+      const parts = body.split('|').map(s => s.trim());
+      const opts = parts.slice(1).filter(Boolean).map(t => ({ ok: t.startsWith('*'), t: back(t.replace(/^\*+\s*/, '')) }));
+      while (opts.length < 2) opts.push({ t: '', ok: false });
+      return { q: back(parts[0] || ''), opts, ex: back(tail), lv };
+    });
+    last = ta.value; draw();
+  };
+  function draw() {
+    form.innerHTML = '';
+    items.forEach((it, i) => {
+      const warn = h('div', { class: 'ferr' }), note = h('div', { class: 'small muted' });
+      const check = () => { const p = problems(it); warn.textContent = p.length ? 'Cần sửa: ' + p.join('; ') + '.' : ''; const nOk = it.opts.filter(o => o.ok && o.t.trim()).length; note.textContent = nOk > 1 ? 'Câu có ' + nOk + ' đáp án đúng: học sinh phải chọn đủ. Câu này không dùng trong các trò chỉ bấm một đáp án (Nổ bóng bay, Đập chuột, Kéo co…).' : ''; };
+      const optBox = h('div', { style: { display: 'grid', gap: '6px' } });
+      const drawOpts = () => { optBox.innerHTML = ''; it.opts.forEach((o, j) => optBox.append(h('div', { class: 'qopt' },
+        h('label', { class: 'okbox', title: 'Đánh dấu đây là đáp án đúng' }, h('input', { type: 'checkbox', checked: o.ok, 'aria-label': 'Đáp án đúng', onchange: e => { o.ok = e.target.checked; e.target.closest('.qopt').classList.toggle('isok', o.ok); check(); push(); } }), 'Đúng'),
+        h('b', null, 'ABCDEFGH'[j] + '.'),
+        h('input', { type: 'text', placeholder: 'Phương án ' + 'ABCDEFGH'[j], value: o.t, oninput: e => { o.t = e.target.value; check(); push(); } }),
+        h('button', { class: 'btn ghost', type: 'button', title: 'Xóa phương án này', disabled: it.opts.length <= 2, onclick: () => { it.opts.splice(j, 1); drawOpts(); check(); push(); } }, '✕')))); optBox.querySelectorAll('.qopt').forEach((el, j) => el.classList.toggle('isok', it.opts[j].ok)); };
+      const move = d => { const j = i + d; if (j < 0 || j >= items.length) return; const x = items[i]; items[i] = items[j]; items[j] = x; draw(); push(); };
+      drawOpts(); check();
+      form.append(h('div', { class: 'qitem' },
+        h('div', { class: 'row' }, h('b', { class: 'grow', style: { fontFamily: 'var(--f-display)', fontSize: '17px' } }, 'Câu ' + (i + 1)),
+          h('select', { 'aria-label': 'Mức độ', style: { width: 'auto' }, onchange: e => { it.lv = e.target.value; push(); } }, h('option', { value: '' }, 'Mức độ: chưa chọn'), Object.entries(LEVELS).map(([k, n]) => h('option', { value: k, selected: it.lv === k }, n))),
+          h('button', { class: 'btn ghost', type: 'button', title: 'Đưa lên trên', disabled: !i, onclick: () => move(-1) }, '▲'), h('button', { class: 'btn ghost', type: 'button', title: 'Đưa xuống dưới', disabled: i === items.length - 1, onclick: () => move(1) }, '▼'),
+          h('button', { class: 'btn ghost', type: 'button', onclick: () => { items.splice(i + 1, 0, JSON.parse(JSON.stringify(it))); draw(); push(); } }, 'Nhân đôi'),
+          h('button', { class: 'btn ghost danger', type: 'button', onclick: e => { if (e.currentTarget.dataset.c) { items.splice(i, 1); draw(); push(); } else { e.currentTarget.dataset.c = 1; e.currentTarget.textContent = 'Bấm lần nữa để xóa'; } } }, 'Xóa')),
+        h('textarea', { placeholder: 'Nội dung câu hỏi', rows: 2, oninput: e => { it.q = e.target.value; check(); push(); } }, it.q),
+        h('div', { class: 'small muted' }, 'Các phương án – tích ô "Đúng" ở đáp án đúng (có thể tích nhiều ô):'), optBox,
+        h('div', null, h('button', { class: 'btn', type: 'button', disabled: it.opts.length >= 6, onclick: () => { it.opts.push({ t: '', ok: false }); drawOpts(); } }, '+ Thêm phương án')),
+        h('input', { type: 'text', placeholder: 'Giải thích đáp án (không bắt buộc, hiện sau khi học sinh trả lời)', value: it.ex, oninput: e => { it.ex = e.target.value; push(); } }),
+        warn, note));
+    });
+    form.append(h('div', { class: 'row' }, h('button', { class: 'btn primary big', type: 'button', onclick: () => { items.push(blank()); draw(); stats(); const all = form.querySelectorAll('.qitem textarea'); all[all.length - 1].focus(); } }, '+ Thêm câu hỏi'),
+      items.length ? null : h('span', { class: 'small muted' }, 'Chưa có câu nào. Bấm "Thêm câu hỏi", hoặc dùng AI ở khung Tài liệu tham khảo phía trên, hoặc chuyển sang "Nhập nhanh nhiều câu" để dán cả loạt.')));
+    stats();
+  }
+  function sync() {
+    const q = isQ(), showForm = q && mode === 'form';
+    wrap.hidden = !q; form.hidden = !showForm; stat.hidden = !showForm; ta.hidden = showForm; if (hint) hint.hidden = showForm;
+    if (showForm && ta.value !== last) load();
+  }
+  new MutationObserver(sync).observe(bar, { childList: true });
+  sync();
+}
+const __vEditor0 = vEditor;
+vEditor = function (id) { const v = __vEditor0(id); try { attachQForm(v); } catch (e) { console.warn('qform', e); } return v; };
 
 /* ===== 20 TRÒ CHƠI DÙNG CÂU TRẮC NGHIỆM ===== */
 const COLORS = ['#E35D4B', '#3C8DD8', '#F3B53A', '#2E9B63', '#8A55C9', '#E07BB0', '#4FB8B0', '#C98A3A'];
