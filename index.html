@@ -915,7 +915,7 @@ function vHub() {
       const n = COUNT(D, g.kind), ok = n >= g.min;
       grid.append(h('button', { type: 'button', class: 'gcard', 'aria-disabled': !ok, title: ok ? g.desc : `Cần ít nhất ${g.min} mục ở phần "${KIND_SRC[g.kind]}"`, onclick: () => ok ? go('play', { game: g.id, pack: p.id }) : toast(`Trò này cần ít nhất ${g.min} mục ở phần "${KIND_SRC[g.kind]}". Hiện có ${n}.`) },
         h('span', { class: 'gico c-' + g.kind }, g.ab),
-        h('span', null, h('span', { class: 'gnum' }, String(GAMES.indexOf(g) + 1).padStart(2, '0') + ' · ' + KINDS[g.kind] + (g.team ? ' · đội' : '')), h('b', null, g.name), h('small', null, ok ? g.desc : `Cần ${g.min} mục "${KIND_SRC[g.kind]}"`))));
+        h('span', null, h('span', { class: 'gnum' }, String(GAMES.indexOf(g) + 1).padStart(2, '0') + ' · ' + KINDS[g.kind] + (g.team ? ' · đội' : '') + (g.reflex ? ' · cần phản xạ' : '') + (g.luck ? ' · có may rủi' : '')), h('b', null, g.name), h('small', null, ok ? g.desc : `Cần ${g.min} mục "${KIND_SRC[g.kind]}"`))));
     });
   };
   const chips = h('div', { class: 'chips' });
@@ -1652,11 +1652,12 @@ function openShare(p, pre) {
   body.append(
     p.draft || p.status === 'Chờ duyệt' ? h('div', { class: 'note' }, 'Câu hỏi do AI soạn. Thầy cô xem lại trước khi gửi cho học sinh. ', h('button', { class: 'btn', onclick: () => go('editor', p.id) }, 'Xem / sửa câu hỏi')) : null,
     h('div', { class: 'card', style: { display: 'grid', gap: '14px' } },
-      h('div', null, h('h3', null, '1. Trò chơi học sinh được chơi'), h('p', { class: 'small muted' }, 'Bấm để chọn hoặc bỏ. Màu xanh là đã chọn.'), chipSet(avail, g => chosen.has(g.id), g => chosen.has(g.id) ? chosen.delete(g.id) : chosen.add(g.id), g => g.name)),
+      h('div', null, h('h3', null, '1. Trò chơi học sinh được chơi'), h('p', { class: 'small muted' }, 'Bấm để chọn hoặc bỏ. Màu xanh là đã chọn. Trò ghi "cần phản xạ" phụ thuộc cả tốc độ tay, không nên dùng khi kiểm tra.'), chipSet(avail, g => chosen.has(g.id), g => chosen.has(g.id) ? chosen.delete(g.id) : chosen.add(g.id), g => g.name + (g.reflex ? ' (cần phản xạ)' : ''))),
       h('div', null, h('h3', null, '2. Số lần làm'), segOne([[1, '1 lần'], [2, '2 lần'], [3, '3 lần'], [0, 'Nhiều lần']], () => att, x => att = x)),
       h('div', null, h('h3', null, '3. Xem đáp án'), segOne([['now', 'Ngay sau mỗi câu (luyện tập)'], ['end', 'Cuối bài (kiểm tra)']], () => fb, x => fb = x)),
       h('div', null, h('h3', null, '4. Lớp được giao'), gradeCls.length ? chipSet(gradeCls, c => cls.has(c), c => cls.has(c) ? cls.delete(c) : cls.add(c), c => c + ' · ' + S.roster.classes[c].length + ' HS')
         : h('div', { class: 'note' }, 'Chưa có danh sách học sinh' + (S.roster ? ' của khối ' + p.grade : '') + ', nên học sinh sẽ chưa bấm chọn tên được. ', h('button', { class: 'btn primary', onclick: () => go('roster') }, 'Tải danh sách học sinh lên'))),
+      h('p', { class: 'small muted' }, 'Lưu ý: học sinh tự chọn tên và số lần làm được đếm theo từng máy, nên kết quả phù hợp cho luyện tập và kiểm tra thường xuyên, chưa đủ làm căn cứ kiểm tra chính thức.'),
       h('div', null, h('button', { class: 'btn sun big', onclick: make }, 'Tạo link giao bài'))),
     out,
     h('details', { class: 'adv' }, h('summary', null, 'Xem nhanh ' + D.q.length + ' câu trắc nghiệm của bài'), h('div', null, D.q.map((q, i) => h('div', { class: 'small' }, h('b', null, (i + 1) + '. ' + q.q), ' — Đáp án: ' + q.ans.map(a => q.opts[a]).join('; '))))));
@@ -2187,7 +2188,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.15-2227';
+const BUILD = '2026.11.15-2237';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2413,7 +2414,7 @@ function vHome() {
   refreshMatLessons().then(ch => { if (ch && v.isConnected) fillLessons(); });
   v.append(
     h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h1', null, 'Tạo trò chơi nhanh'), h('p', { class: 'muted' }, S.profile.teacher ? 'GV: ' + S.profile.teacher + ' · chọn bài, chọn trò, bấm chơi.' : 'Chọn bài, chọn trò, bấm chơi.')),
-      h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
+      h('button', { class: 'btn sun', onclick: () => go('play', { game: 'q2', pack: (getPack('demo-khtn6') || S.lib[0]).id }) }, '▶ Thử ngay với bài mẫu'), h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
     h('div', { class: 'card quick' },
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '1'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn bài'),
         h('div', { class: 'fgrid' }, f('Môn học', subBox), f('Khối', gradeSel)),
@@ -2564,7 +2565,7 @@ defGame({ id: 'q2', kind: 'q', name: 'Đường đua tri thức', ab: 'ĐĐ', te
   play(c) {
     const T = c.teams || [{ name: c.student ? S.student.label : 'Em', score: 0 }];
     const goal = c.teams ? Math.max(3, Math.floor(c.qs.length / T.length)) : c.qs.length;
-    const track = h('div', { style: { display: 'grid', gap: '8px' } }), qb = h('div');
+    const track = h('div', { style: { display: 'grid', gap: '8px' } }), qb = h('div'); let reached = false;
     c.arena.append(track, qb);
     const draw = () => { track.innerHTML = ''; T.forEach((t, i) => { const fr = Math.min(1, t.score / goal); track.append(h('div', { style: { position: 'relative', height: '46px', background: 'var(--s-tile)', borderRadius: '10px', border: c.teams && i === c.turn ? '2px solid var(--sun)' : '1px solid var(--s-tile2)' } },
       h('span', { style: { position: 'absolute', left: '10px', top: '12px', fontWeight: 700, fontSize: '14px' } }, t.name + ' · ' + t.score),
@@ -2573,7 +2574,8 @@ defGame({ id: 'q2', kind: 'q', name: 'Đường đua tri thức', ab: 'ĐĐ', te
     draw();
     qSeries(c, (q, i, next) => c.askQ(qb, q, ok => {
       const t = T[c.turn]; if (ok) t.score++; draw();
-      if (t.score >= goal) return c.end(c.teams ? {} : { title: 'VỀ ĐÍCH!' });
+      if (t.score >= goal) reached = true;
+      if (reached && (!c.teams || c.turn === T.length - 1)) return c.end(c.teams ? {} : { title: 'VỀ ĐÍCH!' });   // đội về đích rồi vẫn cho các đội sau đủ lượt trong vòng
       c.nextTurn(); draw(); next();
     }, { label: c.teams ? 'Lượt: ' + T[c.turn].name : null }));
   } });
@@ -2589,9 +2591,9 @@ defGame({ id: 'q3', kind: 'q', name: 'Leo tháp', ab: 'LT', desc: 'Đúng thì x
     qSeries(c, (q, i, next) => c.askQ(main, q, ok => { floors = ok ? floors + 1 : Math.max(0, floors - 1); best = Math.max(best, floors); draw(); next(); }));
   } });
 
-defGame({ id: 'q4', kind: 'q', name: 'Vòng quay may mắn', ab: 'VQ', team: true, desc: 'Quay vòng chọn số điểm rồi trả lời câu hỏi để giành điểm.', how: 'Bấm QUAY để chọn mức điểm, sau đó trả lời câu hỏi. Ô "Mất lượt" chuyển lượt cho đội khác.',
+defGame({ id: 'q4', kind: 'q', luck: true, name: 'Vòng quay may mắn', ab: 'VQ', team: true, desc: 'Quay vòng chọn số điểm rồi trả lời câu hỏi để giành điểm.', how: 'Bấm QUAY để chọn mức điểm, sau đó trả lời câu hỏi. Ô "Mất lượt" chuyển lượt cho đội khác.',
   play(c) {
-    const segs = [10, 20, 30, 50, 'Mất lượt', 20, 40, 100, 10, 'x2'];
+    const segs = S.fair ? Array(10).fill(10) : [10, 20, 30, 50, 'Mất lượt', 20, 40, 100, 10, 'x2'];
     const T = c.teams || [{ name: 'Điểm', score: 0 }];
     const { side, main } = splitArena(c, 'minmax(0,1fr) minmax(0,1.6fr)');
     const cv = h('canvas', { width: 600, height: 600, style: { width: '100%', maxWidth: '330px', transition: 'transform 3.2s cubic-bezier(.17,.67,.2,1)', justifySelf: 'center' } });
@@ -2619,11 +2621,11 @@ defGame({ id: 'q4', kind: 'q', name: 'Vòng quay may mắn', ab: 'VQ', team: tru
     turn();
   } });
 
-defGame({ id: 'q5', kind: 'q', name: 'Ô cửa bí mật', ab: 'ÔC', team: true, desc: 'Chọn ô cửa để mở câu hỏi; có ô ngôi sao nhân đôi và ô quà may mắn.', how: 'Chọn một ô cửa. Phía sau là câu hỏi (10 điểm), ngôi sao (20 điểm) hoặc quà may mắn (cộng ngay 10 điểm).',
+defGame({ id: 'q5', kind: 'q', luck: true, name: 'Ô cửa bí mật', ab: 'ÔC', team: true, desc: 'Chọn ô cửa để mở câu hỏi; có ô ngôi sao nhân đôi và ô quà may mắn.', how: 'Chọn một ô cửa. Phía sau là câu hỏi (10 điểm), ngôi sao (20 điểm) hoặc quà may mắn (cộng ngay 10 điểm).',
   play(c) {
     const T = c.teams || [{ name: 'Điểm', score: 0 }];
-    const n = c.qs.length, extra = Math.max(1, Math.round(n / 6));
-    const doors = shuffle([...c.qs.map((q, i) => ({ q, type: i % 5 === 2 ? 'star' : 'q' })), ...Array.from({ length: extra }, () => ({ type: 'gift' }))]);
+    const n = c.qs.length, extra = S.fair ? 0 : Math.max(1, Math.round(n / 6));
+    const doors = shuffle([...c.qs.map((q, i) => ({ q, type: !S.fair && i % 5 === 2 ? 'star' : 'q' })), ...Array.from({ length: extra }, () => ({ type: 'gift' }))]);
     const box = h('div'); c.arena.append(box);
     const grid = () => {
       box.innerHTML = ''; const tb = h('div'); c.teamBar(tb);
@@ -2655,7 +2657,7 @@ defGame({ id: 'q6', kind: 'q', name: 'Nổ bóng bay', ab: 'BB', desc: 'Bóng ba
     });
   } });
 
-defGame({ id: 'q7', kind: 'q', name: 'Đập chuột', ab: 'ĐC', desc: 'Chuột chui lên mang đáp án, đập đúng con mang đáp án đúng.', how: 'Các chú chuột lần lượt ngoi lên kèm đáp án. Bấm thật nhanh vào chú mang đáp án đúng.',
+defGame({ id: 'q7', kind: 'q', reflex: true, name: 'Đập chuột', ab: 'ĐC', desc: 'Chuột chui lên mang đáp án, đập đúng con mang đáp án đúng.', how: 'Các chú chuột lần lượt ngoi lên kèm đáp án. Bấm thật nhanh vào chú mang đáp án đúng.',
   play(c) {
     let ok = 0;
     qSeries(c, (q, i, next) => {
@@ -2679,7 +2681,7 @@ defGame({ id: 'q7', kind: 'q', name: 'Đập chuột', ab: 'ĐC', desc: 'Chuột
     });
   } });
 
-defGame({ id: 'q8', kind: 'q', name: 'Câu cá', ab: 'CC', desc: 'Canh thời điểm thả câu để bắt chú cá mang đáp án đúng.', how: 'Cá bơi qua lại dưới cần câu. Bấm THẢ CÂU (hoặc phím cách) đúng lúc cá mang đáp án đúng ở ngay dưới lưỡi câu.',
+defGame({ id: 'q8', kind: 'q', reflex: true, name: 'Câu cá', ab: 'CC', desc: 'Canh thời điểm thả câu để bắt chú cá mang đáp án đúng.', how: 'Cá bơi qua lại dưới cần câu. Bấm THẢ CÂU (hoặc phím cách) đúng lúc cá mang đáp án đúng ở ngay dưới lưỡi câu.',
   play(c) {
     let ok = 0;
     qSeries(c, (q, i, next) => {
@@ -2706,7 +2708,7 @@ defGame({ id: 'q8', kind: 'q', name: 'Câu cá', ab: 'CC', desc: 'Canh thời đ
     });
   } });
 
-defGame({ id: 'q9', kind: 'q', name: 'Máy bay đáp án', ab: 'MB', desc: 'Lái máy bay bay qua cổng mang đáp án đúng.', how: 'Dùng phím ↑ ↓ hoặc bấm vào làn bay để điều khiển máy bay đi qua cổng có đáp án đúng.',
+defGame({ id: 'q9', kind: 'q', reflex: true, name: 'Máy bay đáp án', ab: 'MB', desc: 'Lái máy bay bay qua cổng mang đáp án đúng.', how: 'Dùng phím ↑ ↓ hoặc bấm vào làn bay để điều khiển máy bay đi qua cổng có đáp án đúng.',
   play(c) {
     let ok = 0;
     qSeries(c, (q, i, next) => {
@@ -2728,7 +2730,7 @@ defGame({ id: 'q9', kind: 'q', name: 'Máy bay đáp án', ab: 'MB', desc: 'Lái
     });
   } });
 
-defGame({ id: 'q10', kind: 'q', name: 'Mê cung đuổi bắt', ab: 'MC', desc: 'Di chuyển tới góc có đáp án đúng, tránh bóng ma.', how: 'Dùng phím mũi tên hoặc nút điều hướng để chạy tới góc mang đáp án đúng. Chạm bóng ma sẽ mất một mạng (có 3 mạng).',
+defGame({ id: 'q10', kind: 'q', reflex: true, name: 'Mê cung đuổi bắt', ab: 'MC', desc: 'Di chuyển tới góc có đáp án đúng, tránh bóng ma.', how: 'Dùng phím mũi tên hoặc nút điều hướng để chạy tới góc mang đáp án đúng. Chạm bóng ma sẽ mất một mạng (có 3 mạng).',
   play(c) {
     let ok = 0, lives = 3;
     qSeries(c, (q, i, next) => {
@@ -2849,7 +2851,8 @@ defGame({ id: 'q14', kind: 'q', name: 'Rắn và thang', ab: 'RT', team: true, d
   play(c) {
     const T = c.teams || [{ name: 'Em', score: 0 }]; const posA = T.map(() => 1);
     const lad = { 3: 11, 8: 16, 14: 22, 19: 27 }, snk = { 13: 5, 21: 9, 26: 17, 29: 20 };
-    const pool = c.allQs(); let qi = 0;
+    const pool = c.allQs(); let qi = 0, fin = false;
+    const lastTurn = () => !c.teams || c.turn === T.length - 1, finish = () => { T.forEach((t, i) => t.score = posA[i]); c.after(800, () => c.end(c.teams ? {} : { title: 'VỀ ĐÍCH Ô 30!' })); };
     const { side, main } = splitArena(c, 'minmax(0,1.3fr) minmax(0,1.6fr)');
     const board = h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: '4px' } });
     const dice = h('div', { style: { fontFamily: 'var(--f-display)', fontSize: '40px', textAlign: 'center', fontWeight: 800 } }, '🎲'.length ? '–' : '');
@@ -2867,10 +2870,11 @@ defGame({ id: 'q14', kind: 'q', name: 'Rắn và thang', ab: 'RT', team: true, d
       if (qi >= Math.max(pool.length * 2, 12) || (!c.teams && qi >= pool.length)) return c.end(c.teams ? {} : { title: 'Đã tới ô ' + posA[0] });
       const q = pool[qi++ % pool.length]; c.hud({ progress: 'Lượt ' + qi });
       c.askQ(main, q, ok => {
-        if (!ok) { c.nextTurn(); return turn(); }
+        if (!ok) { if (fin && lastTurn()) return finish(); c.nextTurn(); return turn(); }
         let k = 0; const roll = 1 + (Math.random() * 6 | 0);
         const anim = c.every(80, () => { dice.textContent = 1 + (Math.random() * 6 | 0); if (++k > 10) { anim(); dice.textContent = roll; let p = Math.min(30, posA[c.turn] + roll); let msg = ''; if (lad[p]) { msg = 'Leo thang lên ô ' + lad[p]; p = lad[p]; } else if (snk[p]) { msg = 'Gặp rắn, trượt xuống ô ' + snk[p]; p = snk[p]; } posA[c.turn] = p; if (msg) toast(msg); draw();
-          if (p >= 30) { T.forEach((t, i) => t.score = posA[i]); return c.after(800, () => c.end(c.teams ? {} : { title: 'VỀ ĐÍCH Ô 30!' })); }
+          if (p >= 30) fin = true;
+          if (fin && lastTurn()) return finish();
           c.nextTurn(); c.after(900, turn); } });
       }, { label: (c.teams ? T[c.turn].name + ' · ' : '') + 'Đang ở ô ' + posA[c.turn], norecord: !!c.teams && qi > pool.length, nextLabel: 'Tung xúc xắc' });
     };
@@ -2979,10 +2983,10 @@ defGame({ id: 'q19', kind: 'q', name: 'Ném phi tiêu', ab: 'PT', team: true, de
     qSeries(c, (q, i, next) => { if (!c.teams) c.hud({ points: 'Điểm ' + T[0].score }); c.askQ(c.arena, q, ok => { if (ok) throwDart(() => { c.nextTurn(); next(); }); else { c.nextTurn(); next(); } }, { label: c.teams ? 'Lượt: ' + T[c.turn].name : null, nextLabel: 'Tiếp tục' }); });
   } });
 
-defGame({ id: 'q20', kind: 'q', name: 'Giải mã kho báu', ab: 'KB', team: true, desc: 'Câu đúng nhận chìa khóa, mở rương tìm vàng (cẩn thận rương bẫy).', how: 'Trả lời đúng để nhận chìa khóa, rồi chọn một rương để mở. Rương có thể chứa vàng hoặc bẫy trừ điểm.',
+defGame({ id: 'q20', kind: 'q', luck: true, name: 'Giải mã kho báu', ab: 'KB', team: true, desc: 'Câu đúng nhận chìa khóa, mở rương tìm vàng (cẩn thận rương bẫy).', how: 'Trả lời đúng để nhận chìa khóa, rồi chọn một rương để mở. Rương có thể chứa vàng hoặc bẫy trừ điểm.',
   play(c) {
     const T = c.teams || [{ name: 'Vàng', score: 0 }];
-    const N = Math.max(6, Math.min(12, c.qs.length)); const loot = shuffle(Array.from({ length: N }, (_, i) => [10, 20, 30, 50, 100, -20][i % 6]));
+    const N = Math.max(6, Math.min(12, c.qs.length)); const loot = shuffle(Array.from({ length: N }, (_, i) => (S.fair ? 20 : [10, 20, 30, 50, 100, -20][i % 6])));
     const chests = loot.map(v => ({ v, open: false }));
     const choose = done => {
       c.arena.innerHTML = ''; const tb = h('div'); c.teamBar(tb);
@@ -3088,7 +3092,7 @@ defGame({ id: 'p5', kind: 'pairs', name: 'Kéo thả ghép nghĩa', ab: 'KT', de
     draw();
   } });
 
-defGame({ id: 'p6', kind: 'pairs', name: 'Mưa từ', ab: 'MT', desc: 'Định nghĩa rơi xuống, chọn đúng thuật ngữ trước khi chạm đất.', how: 'Mỗi định nghĩa rơi từ trên xuống. Bấm đúng thuật ngữ ở phía dưới trước khi nó chạm đất. Càng về sau càng rơi nhanh!',
+defGame({ id: 'p6', kind: 'pairs', reflex: true, name: 'Mưa từ', ab: 'MT', desc: 'Định nghĩa rơi xuống, chọn đúng thuật ngữ trước khi chạm đất.', how: 'Mỗi định nghĩa rơi từ trên xuống. Bấm đúng thuật ngữ ở phía dưới trước khi nó chạm đất. Càng về sau càng rơi nhanh!',
   play(c) {
     const P = shuffle(c.D.pairsX).slice(0, 12); let i = 0, speed = 55;
     const f = playfield(c, 380); const btns = h('div', { class: 'opts' }); c.arena.append(f, btns);
@@ -3334,7 +3338,7 @@ defGame({ id: 'w6', kind: 'words', name: 'Giải mã từ khóa', ab: 'GM', desc
     round();
   } });
 
-defGame({ id: 'w7', kind: 'words', name: 'Gõ nhanh', ab: 'GN', desc: 'Đọc gợi ý và gõ đúng từ khóa nhanh nhất trong 90 giây.', how: 'Trong 90 giây, đọc gợi ý và gõ từ khóa (có dấu hoặc không dấu đều được) rồi nhấn Enter. Gõ được càng nhiều càng tốt.',
+defGame({ id: 'w7', kind: 'words', reflex: true, name: 'Gõ nhanh', ab: 'GN', desc: 'Đọc gợi ý và gõ đúng từ khóa nhanh nhất trong 90 giây.', how: 'Trong 90 giây, đọc gợi ý và gõ từ khóa (có dấu hoặc không dấu đều được) rồi nhấn Enter. Gõ được càng nhiều càng tốt.',
   play(c) {
     const ws = shuffle(c.D.words); let i = 0;
     const tb = h('div', { class: 'tbar' }, h('i')), hint = h('div', { class: 'qtext' }), inp = h('input', { type: 'text', id: 'gn', autocomplete: 'off', placeholder: 'Gõ đáp án rồi Enter', style: { fontSize: '22px', maxWidth: '520px', margin: '0 auto' } }), info = h('div', { style: { textAlign: 'center', color: 'var(--s-dim)' } });
@@ -3372,6 +3376,55 @@ defGame({ id: 'w9', kind: 'words', name: 'Điền chữ còn thiếu', ab: 'ĐT'
       list.append(h('div', { style: { display: 'grid', gap: '4px' } }, h('div', { style: { color: 'var(--s-dim)' } }, r.w.hint || ''), line)); });
     c.arena.append(list, checkBtn('Kiểm tra', () => { rows.forEach(r => { let s = ''; [...r.w.p].forEach((ch, k) => s += r.idx.has(k) ? plain(r.ins[k].value) || '·' : ch); const ok = s === r.w.p; c.record(ok, r.w.hint || r.w.w, s, r.w.w); Object.entries(r.ins).forEach(([k, inp]) => { const g = plain(inp.value) === r.w.p[k]; inp.style.background = g ? '#7CF2B0' : '#FF9C8F'; if (!g && c.fb()) inp.value = r.w.p[k]; }); }); c.after(2000, () => c.end()); }));
   } });
+
+/* ===== Trò "Tổng hợp nhiều dạng" và Chế độ công bằng ===== */
+defGame({ id: 'm1', kind: 'q', name: 'Tổng hợp nhiều dạng', ab: 'TH', min: 3, desc: 'Một lượt trộn trắc nghiệm, đúng/sai, ghép nối, sắp xếp, điền khuyết.', how: 'Mỗi phần là một dạng câu hỏi khác nhau, lấy từ nội dung của bài. Làm lần lượt từng phần; điểm tính chung cho cả lượt.',
+  play(c) {
+    const D = c.D, tasks = [];
+    c.qs.slice(0, Math.max(3, Math.ceil(c.qs.length / 2))).forEach(q => tasks.push({ t: 'q', q }));
+    shuffle(D.tfX).slice(0, 3).forEach(s => tasks.push({ t: 'tf', s }));
+    if (D.pairsX.length >= 3) tasks.push({ t: 'pairs', P: shuffle(D.pairsX).slice(0, 4) });
+    if (D.seq.length >= 3) tasks.push({ t: 'seq' });
+    if (D.cloze.blanks.length >= 2) D.cloze.blanks.slice(0, 2).forEach((b, i) => tasks.push({ t: 'cz', i }));
+    const order = shuffle(tasks); let i = 0;
+    const wait = () => c.fb() ? 1800 : 500, grid = { display: 'grid', gap: '10px', maxWidth: '900px', width: '100%', margin: '0 auto' };
+    const next = () => { if (i >= order.length) return c.end(); const k = order[i++]; c.hud({ progress: 'Phần ' + i + '/' + order.length }); c.arena.innerHTML = ''; run[k.t](k); };
+    const run = {
+      q: k => c.askQ(c.arena, k.q, next, { label: 'Trắc nghiệm' }),
+      tf: k => c.askQ(c.arena, { q: k.s.s, opts: ['Đúng', 'Sai'], ans: [k.s.v ? 0 : 1], ex: '' }, next, { label: 'Nhận định sau đúng hay sai?', keys: false }),
+      cz: k => {
+        const B = D.cloze.blanks; let bi = 0;
+        const text = D.cloze.parts.map(x => typeof x === 'string' ? x : (bi++ === k.i ? '……' : x.blank)).join('');
+        const others = shuffle([...new Set(B.filter(b => norm(b) !== norm(B[k.i])).concat(D.words.map(w => w.w)))]).slice(0, 3), opts = shuffle([B[k.i]].concat(others));
+        c.askQ(c.arena, { q: text, opts, ans: [opts.indexOf(B[k.i])], ex: '' }, next, { label: 'Chọn từ điền vào chỗ ……', keys: false });
+      },
+      pairs: k => {
+        const P = k.P, opts = shuffle(P.map(p => p.b));
+        const sels = P.map(() => h('select', { style: { color: 'var(--ink)', minHeight: '48px' } }, h('option', { value: '' }, '— chọn nội dung đúng —'), opts.map(o => h('option', { value: o }, o))));
+        c.arena.append(h('div', { class: 'qtext' }, 'Ghép mỗi mục với nội dung đúng'), h('div', { style: grid }, P.map((p, j) => h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.5fr)', gap: '8px', alignItems: 'center' } }, h('div', { class: 'tile', style: { cursor: 'default' } }, p.a), sels[j]))),
+          checkBtn('Kiểm tra', () => { P.forEach((p, j) => { const ok = sels[j].value === p.b; c.record(ok, p.a, sels[j].value || '(trống)', p.b); sels[j].style.background = ok ? '#7CF2B0' : '#FF9C8F'; sels[j].disabled = true; }); c.after(wait(), next); }));
+      },
+      seq: () => {
+        const items = D.seq.map((s, j) => Object.assign({ j }, s)); let ord = shuffle(items); for (let t = 0; t < 5 && ord.every((x, n) => x.j === n); t++) ord = shuffle(items);
+        const list = h('div', { style: grid });
+        const draw = () => { list.innerHTML = ''; ord.forEach((it, n) => list.append(h('div', { style: { display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'center' } }, h('div', { class: 'tile', style: { textAlign: 'left', cursor: 'default' } }, (n + 1) + '. ' + it.text),
+          h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '4px' } }, h('button', { class: 'sbtn', style: { padding: '6px 10px' }, disabled: !n, onclick: () => { const x = ord[n - 1]; ord[n - 1] = ord[n]; ord[n] = x; draw(); } }, '▲'), h('button', { class: 'sbtn', style: { padding: '6px 10px' }, disabled: n === ord.length - 1, onclick: () => { const x = ord[n + 1]; ord[n + 1] = ord[n]; ord[n] = x; draw(); } }, '▼'))))); };
+        draw();
+        c.arena.append(h('div', { class: 'qtext' }, 'Sắp xếp theo đúng trình tự (dùng nút ▲ ▼)'), list, checkBtn('Kiểm tra', () => { ord.forEach((it, n) => c.record(it.j === n, 'Vị trí ' + (n + 1), it.text, items[n].text)); list.querySelectorAll('.tile').forEach((t, n) => t.classList.add(ord[n].j === n ? 'okc' : 'badc')); list.querySelectorAll('button').forEach(b => b.disabled = true); c.after(wait(), next); }));
+      }
+    };
+    next();
+  } });
+
+/* Chế độ công bằng: chỉ hiện ở các trò có yếu tố may rủi, khi giáo viên trình chiếu */
+S.fair = LS.get('dh.fair', false);
+const __pregame0 = pregame;
+pregame = function (stage, def, pack, student) {
+  __pregame0(stage, def, pack, student);
+  if (student || !def.luck) return;
+  const btn = [...stage.querySelectorAll('button')].find(b => b.textContent === 'BẮT ĐẦU'); if (!btn) return;
+  btn.before(h('label', { class: 'row', style: { justifyContent: 'center', fontSize: '17px', cursor: 'pointer' } }, h('input', { type: 'checkbox', id: 'pg-fair', checked: S.fair, style: { width: '20px', height: '20px' }, onchange: e => { S.fair = e.target.checked; LS.set('dh.fair', S.fair); } }), 'Chế độ công bằng: bỏ yếu tố may rủi, mọi câu cùng số điểm'));
+};
 
 /* ===== THỨ TỰ (4 trò) ===== */
 defGame({ id: 's1', kind: 'seq', name: 'Sắp xếp thứ tự', ab: 'SX', desc: 'Đổi chỗ các mục để xếp đúng trình tự.', how: 'Bấm một mục rồi bấm mục khác để đổi chỗ (hoặc dùng nút ▲ ▼). Xếp xong bấm Kiểm tra.',
@@ -3435,7 +3488,7 @@ defGame({ id: 'g1', kind: 'groups', name: 'Phân loại nhóm', ab: 'PL', min: 2
     draw();
   } });
 
-defGame({ id: 'g2', kind: 'groups', name: 'Băng chuyền phân loại', ab: 'BC', min: 2, desc: 'Các mục chạy trên băng chuyền, đẩy nhanh vào đúng thùng.', how: 'Mục ở đầu băng chuyền đang chạy tới. Bấm thùng đúng (hoặc phím số 1, 2, 3) trước khi mục rơi khỏi băng.',
+defGame({ id: 'g2', kind: 'groups', reflex: true, name: 'Băng chuyền phân loại', ab: 'BC', min: 2, desc: 'Các mục chạy trên băng chuyền, đẩy nhanh vào đúng thùng.', how: 'Mục ở đầu băng chuyền đang chạy tới. Bấm thùng đúng (hoặc phím số 1, 2, 3) trước khi mục rơi khỏi băng.',
   play(c) {
     const G = c.D.groups, items = shuffle(allItems(c.D)).slice(0, 15); let i = 0, speed = 70;
     const f = playfield(c, 160); const belt = h('div', { style: { position: 'absolute', left: 0, right: 0, top: '70px', height: '14px', background: 'repeating-linear-gradient(90deg,#444 0 20px,#666 20px 40px)' } }); f.append(belt);
