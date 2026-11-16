@@ -1970,8 +1970,26 @@ function parsePlainQuiz(text) {
   }
   return out;
 }
+/* Câu trả lời AI chép từ web hay bị hỏng JSON (thiếu đầu/cuối, dấu cách lạ, nháy cong, dấu phẩy thừa):
+   nhặt từng mục {…} còn nguyên vẹn rồi xếp loại theo các khóa của nó. */
+function salvageJSON(text) {
+  let t = String(text).replace(/[  -​ ﻿]/g, ' ').replace(/```(?:json)?/gi, '');
+  if (!/"\s*:/.test(t) && /[“”]\s*:/.test(t)) t = t.replace(/[“”]/g, '"');
+  const tryParse = s => { for (const x of [s, s.replace(/,\s*([}\]])/g, '$1').replace(/[\n\t]+/g, ' ')]) { try { return parseLooseJSON(x); } catch (e) { } } return null; };
+  const endOf = i => { let d = 0, str = false; for (let j = i; j < t.length; j++) { const ch = t[j]; if (str) { if (ch === '\\') j++; else if (ch === '"') str = false; } else if (ch === '"') str = true; else if (ch === '{') d++; else if (ch === '}' && --d === 0) return j; } return -1; };
+  const o = {}, add = (k, x) => (o[k] = o[k] || []).push(x);
+  for (let i = t.indexOf('{'); i >= 0; i = t.indexOf('{', i + 1)) {
+    const j = endOf(i); if (j < 0) continue;
+    const x = tryParse(t.slice(i, j + 1)); if (!x || typeof x !== 'object' || Array.isArray(x)) continue;
+    const k = x.q && Array.isArray(x.options) ? 'q' : x.a && x.b ? 'pairs' : x.w ? 'words' : x.name && Array.isArray(x.items) ? 'groups' : x.s && 'v' in x ? 'tf' : x.text && !x.q ? 'seq' : '';
+    if (k) { add(k, x); i = j; }
+  }
+  for (const k of ['cloze', 'keyword']) { const m = t.match(new RegExp('"' + k + '"\\s*:\\s*("(?:[^"\\\\]|\\\\.)*")')); if (m) { const s = tryParse(m[1]); if (typeof s === 'string') o[k] = s; } }
+  return Object.keys(o).length ? o : null;
+}
 function readPasted(text) {
   try { const o = parseLooseJSON(text); if (o && typeof o === 'object' && !Array.isArray(o)) return o; if (Array.isArray(o) && o.length && o[0].q) return { q: o }; } catch (e) { }
+  if (/"\s*:|[“”]\s*:/.test(text)) { const s = salvageJSON(text); if (s) return s; }
   const q = parsePlainQuiz(text); if (q.length) return { q };
   const p = parseQ(text); if (p.list.length) return { q: p.list.map(x => ({ q: x.q, options: x.opts, correct: x.ans, explain: x.ex })) };
   return null;
@@ -1981,9 +1999,9 @@ function readPasted(text) {
 async function runAI(pk, opt) {
   const el = opt.statusEl, say = (...k) => { el.innerHTML = ''; el.append(...k.filter(Boolean)); };
   let texts = opt.texts || '', used = [];
-  if (!texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
+  if (!opt.paste && !texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
   const images = (opt.images || []).slice(), pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
-  if (!texts.trim() && !images.length) { say(h('div', { class: 'note' }, 'Đang lấy các trang sách của bài…')); try { const sc = await scanImages(pk); sc.forEach(b => images.push(b)); if (sc.length) used.push('ảnh ' + sc.length + ' trang sách (trang ' + pk.pages + ')'); } catch (e) { } }
+  if (!opt.paste && !texts.trim() && !images.length) { say(h('div', { class: 'note' }, 'Đang lấy các trang sách của bài…')); try { const sc = await scanImages(pk); sc.forEach(b => images.push(b)); if (sc.length) used.push('ảnh ' + sc.length + ' trang sách (trang ' + pk.pages + ')'); } catch (e) { } }
   const hasMat = !!(texts.trim() || images.length || pdfs.length);
   const prompt = buildPrompt(pk, opt.only, texts, hasMat);
   const finish = (o, byHand) => {
@@ -2003,7 +2021,8 @@ async function runAI(pk, opt) {
     const accept = () => {
       if (!back.value.trim()) { err.hidden = false; err.textContent = 'Ô đang trống. Thầy cô dán câu trả lời của AI (hoặc câu hỏi có sẵn) vào rồi bấm lại.'; return; }
       const o = readPasted(back.value);
-      if (!o) { err.hidden = false; err.textContent = 'Chưa đọc được câu hỏi nào. Mỗi câu cần có dòng "Câu 1: …", các dòng "A. …", "B. …" và dòng "Đáp án: A".'; return; }
+      if (!o) { err.hidden = false; err.textContent = /"\s*:|[{}\[\]]/.test(back.value) ? 'Câu trả lời của AI dán vào bị thiếu nên chưa đọc được. Ở trang AI, thầy cô bấm nút "Sao chép" nằm ngay dưới câu trả lời (chép toàn bộ), rồi dán lại vào ô này.' : 'Chưa đọc được câu hỏi nào. Mỗi câu cần có dòng "Câu 1: …", các dòng "A. …", "B. …" và dòng "Đáp án: A".'; return; }
+      if (!opt.only && !(Array.isArray(o.q) && o.q.length)) { err.hidden = false; err.textContent = 'Phần dán vào thiếu đoạn đầu (các câu trắc nghiệm). Ở trang AI, thầy cô bấm nút "Sao chép" nằm ngay dưới câu trả lời (chép toàn bộ), rồi dán lại vào ô này.'; return; }
       try { finish(o, !o.check); resolve(true); } catch (e) { err.hidden = false; err.textContent = 'Chưa đọc được nội dung đã dán.'; }
     };
     back.addEventListener('paste', () => setTimeout(() => { if (readPasted(back.value)) accept(); }, 60));
@@ -2018,6 +2037,23 @@ async function runAI(pk, opt) {
         back, err,
         h('div', { class: 'row' }, h('button', { class: 'btn sun big', onclick: accept }, 'LƯU CÂU HỎI VÀ TIẾP TỤC')),
         h('details', null, h('summary', { class: 'small muted' }, 'Xem nội dung yêu cầu'), pre)));
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  // Chế độ giáo viên tự soạn: chỉ có ô dán, không gọi AI
+  if (opt.paste) return new Promise(resolve => {
+    const back = h('textarea', { id: 'own-paste', placeholder: 'Câu 1: …\nA. …\nB. …\nC. …\nD. …\nĐáp án: A\n\nCâu 2: …', style: { minHeight: '220px' } });
+    const err = h('div', { class: 'note bad', hidden: true });
+    const accept = () => {
+      if (!back.value.trim()) { err.hidden = false; err.textContent = 'Ô đang trống. Thầy cô dán câu hỏi vào rồi bấm lại.'; return; }
+      const o = readPasted(back.value);
+      if (!o) { err.hidden = false; err.textContent = 'Chưa đọc được câu hỏi nào. Mỗi câu cần có dòng "Câu 1: …", các dòng "A. …", "B. …" và dòng "Đáp án: A".'; return; }
+      try { finish(o, true); resolve(true); } catch (e) { err.hidden = false; err.textContent = 'Chưa đọc được nội dung đã dán.'; }
+    };
+    say(h('div', { class: 'card', style: { display: 'grid', gap: '10px', marginTop: '8px', border: '2px solid var(--sun)' } },
+      h('b', null, 'Dán câu hỏi thầy cô tự soạn'),
+      h('div', { class: 'small muted' }, 'Chép câu hỏi từ Word rồi dán vào ô dưới. Mỗi câu gồm dòng "Câu 1: …", các phương án "A. …", "B. …" và dòng "Đáp án: A" (nhiều đáp án đúng ghi "Đáp án: A, C"; có thể thêm dòng "Giải thích: …").'),
+      back, err,
+      h('div', { class: 'row' }, h('button', { class: 'btn sun big', onclick: accept }, 'LƯU CÂU HỎI VÀ TIẾP TỤC'))));
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
   if (aiProvider() === 'chat') return chatUI('');
@@ -2285,7 +2321,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.16-1549';
+const BUILD = '2026.11.16-1628';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2458,9 +2494,11 @@ function vHome() {
   function syncBtn() {
     v.querySelectorAll('.ferr').forEach(x => x.remove());
     const p = findPack(), n = p ? parsePack(p).q.length : 0;
-    playBtn.textContent = n ? '▶ Chơi trên màn hình' : 'Tạo câu hỏi và chơi trên màn hình'; reviewBtn.hidden = !(n && p.status === 'Chờ duyệt');
-    stateMsg.textContent = !lessonName() ? '' : !n ? 'Bài này chưa có câu hỏi: bấm nút để tạo câu hỏi trước, xong sẽ vào chơi.' : p.status === 'Chờ duyệt' ? 'Bài đã có ' + n + ' câu hỏi do AI soạn, thầy cô chưa duyệt. Nên xem lại trước khi dùng.' : 'Bài đã sẵn sàng: ' + n + ' câu hỏi.';
+    playBtn.textContent = n ? '▶ Chơi trên màn hình' : Q.from === 'paste' ? 'Dán câu hỏi và chơi trên màn hình' : 'Tạo câu hỏi và chơi trên màn hình'; reviewBtn.hidden = !(n && p.status === 'Chờ duyệt');
+    stateMsg.textContent = !lessonName() ? '' : !n ? (Q.from === 'paste' ? 'Bài này chưa có câu hỏi: bấm nút để dán câu hỏi thầy cô tự soạn, xong sẽ vào chơi.' : 'Bài này chưa có câu hỏi: bấm nút để tạo câu hỏi trước, xong sẽ vào chơi.') : p.status === 'Chờ duyệt' ? 'Bài đã có ' + n + ' câu hỏi do AI soạn, thầy cô chưa duyệt. Nên xem lại trước khi dùng.' : 'Bài đã sẵn sàng: ' + n + ' câu hỏi.';
   }
+  // Nguồn câu hỏi: AI soạn theo bài học, hoặc giáo viên dán câu hỏi tự soạn
+  const fromBox = h('div', { class: 'chips' }, [['ai', 'AI tự soạn theo bài học'], ['paste', 'Dán câu hỏi thầy cô tự soạn']].map(([k, t]) => h('button', { type: 'button', class: 'chip', 'data-f': k, 'aria-pressed': (Q.from || 'ai') === k, onclick: () => { Q.from = k; saveQ(); fromBox.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.f === k)); status.innerHTML = ''; v.querySelectorAll('.qgo').forEach(b => b.disabled = false); syncBtn(); } }, t)));
   const fieldErr = (el, text) => { v.querySelectorAll('.ferr').forEach(x => x.remove()); el.after(h('div', { class: 'ferr', role: 'alert' }, text)); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus({ preventScroll: true }); };
   v.addEventListener('change', () => setTimeout(syncBtn, 0));
   function syncLesson() {
@@ -2527,7 +2565,7 @@ function vHome() {
     const pg = (v.querySelector('#q-pages') || {}).value; if (pg) p.pages = pg;
     if (fresh || need()) {
       v.querySelectorAll('.qgo').forEach(b => b.disabled = true);
-      const ok = await runAI(p, { statusEl: status });
+      const ok = await runAI(p, { statusEl: status, paste: Q.from === 'paste' });
       v.querySelectorAll('.qgo').forEach(b => b.disabled = false);
       if (!ok) return;
     }
@@ -2568,6 +2606,7 @@ function vHome() {
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
         h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => { Q.nq = clamp(+e.target.value || 10, 3, 50); saveQ(); } }))))),
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '3'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Bắt đầu'),
+        h('div', { class: 'f' }, h('span', null, 'Câu hỏi lấy từ đâu (áp dụng cho bài chưa có câu hỏi)'), fromBox),
         h('div', { class: 'f' }, h('span', null, 'Lớp (chỉ cần khi giao bài cho học sinh)'), classBox),
         h('div', { class: 'row' }, playBtn, reviewBtn, h('button', { class: 'btn sun big qgo', onclick: () => quickStart('share') }, 'Giao bài cho học sinh')), stateMsg,
         h('p', { class: 'small muted' }, 'Chơi trên màn hình theo đội; hoặc gửi link để học sinh tự làm, kết quả tự về Bảng điểm. Bài đã có câu hỏi sẽ mở ngay.'), status))),
