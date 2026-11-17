@@ -2321,7 +2321,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.17-0826';
+const BUILD = '2026.11.17-0832';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2453,7 +2453,7 @@ vHelp = function () {
   const v = __vHelp0();
   const a = v.querySelector('#hoso'); if (a) a.replaceWith(profileCard());
   const b = v.querySelector('#ppct'); if (b) b.replaceWith(ppctCard());
-  v.append(h('div', { class: 'card', id: 'pb', style: { display: 'grid', gap: '8px' } }, h('h3', null, 'Phiên bản'), h('p', { class: 'small muted' }, 'Bản đang dùng: ' + BUILD + '. App tự kiểm tra và tự cập nhật khi có bản mới, thầy cô không cần cài lại.'), IS_WEB ? h('div', null, h('button', { class: 'btn', onclick: () => checkUpdate(true) }, 'Kiểm tra bản mới ngay')) : null));
+  v.append(h('div', { class: 'card', id: 'pb', style: { display: 'grid', gap: '8px' } }, h('h3', null, 'Phiên bản'), h('p', { class: 'small muted' }, 'Bản đang dùng: ' + BUILD + '. App tự kiểm tra; khi có bản mới sẽ hiện bảng báo để thầy cô bấm "Cập nhật ngay", không cần cài lại.'), IS_WEB ? h('div', null, h('button', { class: 'btn', onclick: () => checkUpdate(true) }, 'Kiểm tra bản mới ngay')) : null));
   return v;
 };
 
@@ -2740,14 +2740,33 @@ new MutationObserver(() => { if (__mathBusy) return; const m = document.getEleme
 /* ---------- TỰ CẬP NHẬT (bản web và bản đã cài trên máy) ---------- */
 async function checkUpdate(manual) {
   if (!IS_WEB || !/^https?:/.test(location.protocol)) return;
-  let ver; try { ver = (await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json()).v; } catch (e) { if (manual) toast('Chưa kiểm tra được (mạng yếu).'); return; }
+  let ver, notes = []; try { const j = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json(); ver = j.v; if (Array.isArray(j.notes)) notes = j.notes.map(String).slice(0, 8); } catch (e) { if (manual) toast('Chưa kiểm tra được (mạng yếu).'); return; }
   if (!ver || ver === BUILD) { if (manual) toast('Thầy cô đang dùng bản mới nhất (' + BUILD + ').'); return; }
   let tried = ''; try { tried = sessionStorage.getItem('dh.upd') || ''; } catch (e) { }
-  const apply = () => { try { sessionStorage.setItem('dh.upd', ver); } catch (e) { } location.replace(location.pathname + '?v=' + encodeURIComponent(ver) + location.hash); };
-  const busy = S.view === 'play' || S.view === 'editor' || !!document.getElementById('ai-paste') || !!document.fullscreenElement;
-  if (manual || (!busy && tried !== ver)) return apply();
+  const apply = () => { try { sessionStorage.setItem('dh.upd', ver); } catch (e) { } LS.set('dh.updnote', { v: ver, notes }); location.replace(location.pathname + '?v=' + encodeURIComponent(ver) + location.hash); };
+  const busy = S.view === 'play' || S.view === 'editor' || !!document.getElementById('ai-paste') || !!document.getElementById('own-paste') || !!document.fullscreenElement;
+  if (manual) return apply();
+  // Học sinh đang làm bài qua link: cập nhật lặng lẽ như trước, không hiện bảng
+  const student = !!S.shared || S.view === 'join';
+  if (student) { if (!busy && tried !== ver) apply(); return; }
+  // Giáo viên: hiện bảng báo có bản mới để thầy cô tự bấm cập nhật
+  let later = ''; try { later = sessionStorage.getItem('dh.updlater') || ''; } catch (e) { }
+  if (!busy && tried !== ver && later !== ver && !document.getElementById('updbox')) {
+    const box = h('div', { id: 'updbox', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Có bản cập nhật mới', style: { position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,.55)', display: 'grid', placeItems: 'center', padding: '16px' } },
+      h('div', { class: 'card', style: { maxWidth: '520px', width: '100%', display: 'grid', gap: '12px', maxHeight: '86vh', overflow: 'auto' } },
+        h('h2', null, 'Đã có bản cập nhật mới'),
+        h('div', { class: 'small muted' }, 'Bản mới: ' + ver + ' · Bản đang dùng: ' + BUILD),
+        notes.length ? h('div', null, h('b', null, 'Có gì mới:'), h('ul', { style: { margin: '6px 0 0', paddingLeft: '20px', display: 'grid', gap: '4px' } }, notes.map(n => h('li', null, n)))) : null,
+        h('div', { class: 'small muted' }, 'Bài đã lưu, danh sách lớp và bảng điểm trên máy thầy cô được giữ nguyên.'),
+        h('div', { class: 'row' }, h('button', { class: 'btn primary big', id: 'upd-go', onclick: apply }, 'Cập nhật ngay'), h('button', { class: 'btn', onclick: () => { try { sessionStorage.setItem('dh.updlater', ver); } catch (e) { } box.remove(); checkUpdate(); } }, 'Để sau'))));
+    document.body.append(box); box.querySelector('#upd-go').focus();
+    return;
+  }
+  if (document.getElementById('updbox')) return;
   if (!document.getElementById('updbar')) document.body.prepend(h('div', { id: 'updbar' }, 'Đã có bản mới của app. ', h('button', { class: 'btn', onclick: apply }, 'Cập nhật ngay'), h('span', { class: 'small' }, ' (đang chơi hoặc đang soạn thì bấm sau cũng được)')));
 }
+// Sau khi cập nhật xong: báo một lần là đã lên bản mới
+if (IS_WEB) setTimeout(() => { const n = LS.get('dh.updnote', null); if (!n) return; LS.set('dh.updnote', null); if (n.v === BUILD) toast('Đã cập nhật xong lên bản ' + BUILD + '.', 6000); }, 1200);
 if (IS_WEB) { setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
 
 /* ===== Biểu mẫu soạn từng câu trắc nghiệm (trang Tạo trò chơi) =====
