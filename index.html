@@ -82,6 +82,16 @@ main{padding-block:22px 60px}
 .btn.big{padding:14px 22px;font-size:16px;border-radius:12px}
 .btn.danger{color:var(--bad)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+/* Nút phụ có màu để dễ nhận ra là nút: xanh nhạt = thao tác thường, đỏ nhạt = xóa/bỏ, xanh lá = lưu duyệt (không áp dụng trong màn chơi) */
+.btn:where(:not(.stage *)){background:color-mix(in srgb,var(--accent) 9%,var(--card));border-color:color-mix(in srgb,var(--accent) 42%,var(--card));color:var(--accent)}
+.btn:where(:not(.stage *)):hover{background:color-mix(in srgb,var(--accent) 17%,var(--card));border-color:var(--accent)}
+.btn.ghost:where(:not(.stage *)){color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.btn.ghost:where(:not(.stage *)):hover{background:color-mix(in srgb,var(--accent) 9%,var(--card))}
+.btn.danger:where(:not(.stage *)){background:color-mix(in srgb,var(--bad) 8%,var(--card));border-color:color-mix(in srgb,var(--bad) 45%,var(--card));color:var(--bad)}
+.btn.danger:where(:not(.stage *)):hover{background:color-mix(in srgb,var(--bad) 16%,var(--card));border-color:var(--bad)}
+.btn.leaf{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.leaf:hover{filter:brightness(1.07)}
+.btn.small{padding:6px 12px;font-size:13px}
 label.f{display:grid;gap:5px;font-size:13px;font-weight:600;color:var(--muted);min-width:0}
 label.f > span{text-transform:uppercase;letter-spacing:.04em;font-size:11.5px}
 input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{width:100%;border:1px solid var(--line);background:var(--paper);border-radius:9px;padding:9px 11px;color:var(--ink);font-weight:500;font-size:14.5px}
@@ -287,7 +297,8 @@ button.hb{cursor:pointer}
 .qstep:last-child{border-bottom:0;background:var(--soft)}
 .qn{flex:none;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:18px}
 select{min-height:40px}
-a.btn{text-decoration:none;color:inherit}
+a.btn{text-decoration:none}
+.stage a.btn{color:inherit}
 /* ===== Giao diện học sinh ===== */
 body.kidbg{background:linear-gradient(160deg,#FFF3D6 0%,#FFE1EC 45%,#DDEBFF 100%)}
 :root[data-theme="dark"] body.kidbg{background:linear-gradient(160deg,#2A1B3D,#1B2A4A)}
@@ -325,6 +336,7 @@ body.kidbg{background:linear-gradient(160deg,#FFF3D6 0%,#FFE1EC 45%,#DDEBFF 100%
   .qn{width:28px;height:28px;font-size:15px}
   h1{font-size:26px}
   .btn.big{width:100%}
+  .quick .btn{white-space:normal;text-align:center}
   .fgrid label.f[style]{grid-column:auto!important}
 }
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
@@ -871,7 +883,7 @@ function vEditor(id) {
 
   // tài liệu tham khảo
   const fileList = h('div', { class: 'filelist' });
-  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – nhập số trang của bài ở ô bên cạnh' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn ghost small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
+  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – nhập số trang của bài ở ô bên cạnh' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn danger small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
   drawFiles();
   const fileIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md,image/*', hidden: true, onchange: async e => {
     for (const file of e.target.files) {
@@ -949,7 +961,7 @@ function vEditor(id) {
       h('div', { style: { marginTop: '12px' } }, calc)),
     h('div', { class: 'card' }, h('h3', null, 'Tài liệu tham khảo'),
       h('p', { class: 'small muted' }, 'SGK, kế hoạch bài dạy, PDF, DOCX, PPTX, ảnh chụp trang sách. Tài liệu chỉ dùng để AI soạn câu hỏi; không gửi danh sách học sinh.'),
-      h('div', { class: 'row', style: { marginTop: '10px' } }, h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Tải tệp lên'), fileIn,
+      h('div', { class: 'row', style: { marginTop: '10px', alignItems: 'flex-end' } }, h('button', { class: 'btn primary', style: { minHeight: '46px' }, onclick: () => fileIn.click() }, 'Tải tệp lên'), fileIn,
         h('label', { class: 'f grow' }, h('span', null, 'Số trang / mục cần bám sát'), inp('pages', { placeholder: 'VD: trang 38–42, mục 2' }))),
       fileList, pasteTa, aiBox),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Kiểm duyệt / chỉnh sửa nội dung'), regen),
@@ -974,7 +986,7 @@ function vEditor(id) {
     h('div', { class: 'row actbar' },
       h('button', { class: 'btn', onclick: () => { if (save()) { S.current = (orig || p).id; go('hub'); } } }, 'XEM TRƯỚC'),
       h('button', { class: 'btn', onclick: () => save('Chờ duyệt') }, 'Lưu nháp'),
-      h('button', { class: 'btn primary', onclick: () => save('Đã duyệt') }, 'DUYỆT VÀ LƯU'),
+      h('button', { class: 'btn leaf', onclick: () => save('Đã duyệt') }, 'DUYỆT VÀ LƯU'),
       h('button', { class: 'btn sun', onclick: () => { if (save('Đã duyệt')) openShare(orig || p); } }, 'PHÁT HÀNH'),
       h('span', { class: 'grow' }),
       orig && !orig.demo ? h('button', { class: 'btn danger', onclick: e => { if (e.target.dataset.c) { deletePack(orig.id); go('library'); } else { e.target.dataset.c = 1; e.target.textContent = 'Bấm lần nữa để xóa'; } } }, 'Xóa bài') : null));
@@ -2321,7 +2333,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.17-0836';
+const BUILD = '2026.11.17-0848';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
