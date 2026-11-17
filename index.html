@@ -2321,7 +2321,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.17-0832';
+const BUILD = '2026.11.17-0836';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2447,12 +2447,42 @@ function ppctCard() {
     h('div', { style: { display: 'grid', gap: '6px' } }, h('b', null, 'Các danh sách đã lưu'), saved));
 }
 
+/* ---------- Xóa dữ liệu đã tạo / đã tải lên cho nhẹ máy (reset) ---------- */
+function resetCard() {
+  const own = () => S.lib.filter(p => !p.demo).length, nStu = () => S.roster ? Object.values(S.roster.classes).reduce((a, c) => a + c.length, 0) : 0;
+  const items = [
+    ['lib', 'Bài đã tạo', () => own() + ' bài', async () => { const ids = S.lib.filter(p => !p.demo).map(p => p.id); S.lib = S.lib.filter(p => p.demo); if (!S.lib.length) S.lib = [demoPack()]; saveLocal(); S.current = null; try { localStorage.removeItem('dh.draft'); } catch (e) { } ids.forEach(id => cloudWrite(() => cPacks().doc(id).delete())); }],
+    ['roster', 'Danh sách học sinh', () => S.roster ? Object.keys(S.roster.classes).length + ' lớp, ' + nStu() + ' học sinh' : 'chưa có', async () => { S.roster = null; try { localStorage.removeItem('dh.roster'); } catch (e) { } cloudWrite(() => cDoc('roster').delete()); }],
+    ['results', 'Bảng điểm (kết quả học sinh đã làm)', () => S.results.length + ' lượt làm bài', async () => { S.results = []; LS.set('dh.results', []); cloudWrite(() => cDoc('results').set({ list: [] })); }],
+    ['kho', 'Tài liệu đã tải lên (SGK, kế hoạch bài dạy)', null, async () => { for (const m of await matAll()) await matDel(m.id); S.pages = {}; LS.set('dh.pages', {}); try { await refreshMatLessons(); } catch (e) { } }],
+    ['ppct', 'Phân phối chương trình', () => Object.keys(S.ppct).length + ' môn-khối', async () => { S.ppct = {}; LS.set('dh.ppct', {}); }],
+    ['assign', 'Danh sách bài đã giao bằng link (xóa rồi thì không tải thêm được kết quả của các link cũ)', () => LS.get('dh.assign', []).length + ' bài đã giao', async () => { LS.set('dh.assign', []); }]
+  ];
+  const boxes = {}, msg = h('div', { class: 'small' });
+  const rows = items.map(([k, label, count]) => { const c = h('span', { class: 'small muted' }, count ? ' – ' + count() : ''); boxes[k] = h('input', { type: 'checkbox', id: 'rs-' + k, onchange: () => disarm() }); return h('label', { class: 'row', style: { gap: '8px', cursor: 'pointer' } }, boxes[k], h('span', null, label, c)); });
+  matAll().then(ms => { const sz = ms.reduce((a, m) => a + (m.blob ? m.blob.size : (m.text || '').length), 0); rows[3].querySelector('.muted').textContent = ' – ' + ms.length + ' tệp' + (sz ? ', khoảng ' + fmtNum(sz / 1048576, 1) + ' MB' : ''); });
+  const btn = h('button', { class: 'btn danger big', id: 'rs-go', onclick: async () => {
+    const pick = items.filter(([k]) => boxes[k].checked);
+    if (!pick.length) { msg.textContent = 'Thầy cô đánh dấu ít nhất một mục cần xóa.'; return; }
+    if (!btn.dataset.c) { btn.dataset.c = 1; btn.textContent = 'Bấm lần nữa để XÓA HẲN ' + pick.length + ' mục đã chọn'; msg.textContent = 'Xóa rồi không lấy lại được. Nếu cần giữ điểm, thầy cô vào Bảng điểm xuất Excel trước.'; return; }
+    btn.disabled = true; msg.textContent = 'Đang xóa…';
+    for (const it of pick) { try { await it[3](); } catch (e) { } }
+    toast('Đã xóa ' + pick.length + ' mục', 4000); render();
+  } }, 'Xóa các mục đã chọn');
+  const disarm = () => { delete btn.dataset.c; btn.textContent = 'Xóa các mục đã chọn'; msg.textContent = ''; };
+  return h('div', { class: 'card', id: 'reset', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Xóa dữ liệu cho nhẹ máy (reset)'),
+    h('p', { class: 'small muted' }, 'Đánh dấu những thứ muốn xóa trên máy này rồi bấm nút. Hồ sơ giáo viên, cài đặt AI và logo được giữ nguyên.'),
+    h('div', null, h('button', { class: 'btn', type: 'button', onclick: () => { const all = items.every(([k]) => boxes[k].checked); items.forEach(([k]) => boxes[k].checked = !all); disarm(); } }, 'Chọn tất cả / bỏ chọn')),
+    rows, h('div', null, btn), msg);
+}
+
 /* ---------- Trang Cài đặt: thay hai mục Hồ sơ và Phân phối chương trình, thêm mục phiên bản ---------- */
 const __vHelp0 = vHelp;
 vHelp = function () {
   const v = __vHelp0();
   const a = v.querySelector('#hoso'); if (a) a.replaceWith(profileCard());
   const b = v.querySelector('#ppct'); if (b) b.replaceWith(ppctCard());
+  v.append(resetCard());
   v.append(h('div', { class: 'card', id: 'pb', style: { display: 'grid', gap: '8px' } }, h('h3', null, 'Phiên bản'), h('p', { class: 'small muted' }, 'Bản đang dùng: ' + BUILD + '. App tự kiểm tra; khi có bản mới sẽ hiện bảng báo để thầy cô bấm "Cập nhật ngay", không cần cài lại.'), IS_WEB ? h('div', null, h('button', { class: 'btn', onclick: () => checkUpdate(true) }, 'Kiểm tra bản mới ngay')) : null));
   return v;
 };
@@ -2641,7 +2671,7 @@ function vHome() {
         h('div', { class: 'f' }, h('span', null, 'Lớp (chỉ cần khi giao bài cho học sinh)'), classBox),
         h('div', { class: 'row' }, playBtn, reviewBtn, h('button', { class: 'btn sun big qgo', onclick: () => quickStart('share') }, 'Giao bài cho học sinh')), stateMsg,
         h('p', { class: 'small muted' }, 'Chơi trên màn hình theo đội; hoặc gửi link để học sinh tự làm, kết quả tự về Bảng điểm. Bài đã có câu hỏi sẽ mở ngay.'), status))),
-    h('div', { class: 'row' }, matPill, pill('Phân phối chương trình: ' + (Object.keys(S.ppct).length ? Object.keys(S.ppct).length + ' môn-khối' : 'chưa tải'), Object.keys(S.ppct).length > 0, () => goHelp('ppct')), pill('Học sinh: ' + (S.roster ? Object.keys(S.roster.classes).length + ' lớp' : 'chưa tải'), !!S.roster, () => go('roster')), pill(aiLabel(), aiProvider() !== 'chat', () => goHelp('ai'))),
+    h('div', { class: 'row' }, matPill, pill('Phân phối chương trình: ' + (Object.keys(S.ppct).length ? Object.keys(S.ppct).length + ' môn-khối' : 'chưa tải'), Object.keys(S.ppct).length > 0, () => goHelp('ppct')), pill('Học sinh: ' + (S.roster ? Object.keys(S.roster.classes).length + ' lớp' : 'chưa tải'), !!S.roster, () => go('roster')), pill(aiLabel(), aiProvider() !== 'chat', () => goHelp('ai')), h('button', { class: 'pill plain', style: { border: 0, cursor: 'pointer' }, onclick: () => goHelp('reset') }, 'Xóa dữ liệu (reset)')),
     homeHero(),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Bài đã lưu – bấm Chơi để chơi lại ngay'), h('button', { class: 'btn', onclick: () => go('editor', null) }, 'Tự soạn / dán câu hỏi')), libTable(S.lib.slice(0, 6))));
   if (v._setup) v.querySelector('.hero').before(v._setup);   // hồ sơ không chặn người mới: nằm phía dưới, điền sau cũng được
