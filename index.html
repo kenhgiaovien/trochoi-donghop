@@ -2321,7 +2321,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.16-1628';
+const BUILD = '2026.11.17-0826';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2457,6 +2457,20 @@ vHelp = function () {
   return v;
 };
 
+/* Đọc tệp phân phối chương trình (Excel, Word, PDF, PowerPoint, văn bản) thành danh sách bài – dùng cho nút tải ở Trang chủ */
+async function ppctParse(file, grade) {
+  if (/\.(xlsx|xls|csv)$/i.test(file.name)) {
+    const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX'), wb = XLSX.read(await readFileBuf(file), { type: 'array' });
+    const sheets = wb.SheetNames.map(n => ({ name: n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }).filter(r => r.some(c => String(c).trim())) })).filter(s => s.rows.length);
+    if (!sheets.length) throw new Error('tệp trống');
+    const g = sheets.findIndex(s => new RegExp('(^|\\D)' + grade + '(\\D|$)').test(s.name)), sh = sheets[g >= 0 ? g : 0], c = guessCols(sh.rows);
+    return { ls: rowsToLessons(sh.rows, c.hi, c.nc, c.cc), from: 'trang tính "' + sh.name + '", cột ' + colName(c.nc) };
+  }
+  const text = await extractText(file), ls = [], seen = new Set();
+  text.split(/\n/).forEach(l => { const t = cleanTitle(l); if (/^(bài|chủ đề|unit|chuyên đề|tiết)\s*\d+/i.test(t) && t.length > 5 && t.length < 170 && !seen.has(norm(t))) { seen.add(norm(t)); const m = l.match(/(\d+)\s*tiết/i); ls.push({ t, n: m ? Math.min(+m[1], 19) : 1 }); } });
+  return { ls, from: '' };
+}
+
 /* ---------- TẠO NHANH: chọn môn/khối/bài không vẽ lại cả trang nên màn hình không nhảy ---------- */
 function vHome() {
   const Q = Object.assign({ subject: mySubjects()[0] || '', grade: '', lesson: '', custom: '', period: 'Toàn bài', classes: [], game: 'q2', nq: 10 }, S.quick);
@@ -2475,6 +2489,19 @@ function vHome() {
   const lessonSel = h('select', { id: 'q-lesson', onchange: e => { Q.lesson = e.target.value; Q.period = 'Toàn bài'; saveQ(); syncLesson(); } });
   const customIn = h('input', { type: 'text', id: 'q-custom', placeholder: 'Gõ tên bài, VD: Bài 7. Tìm kiếm thông tin trên Internet', value: Q.custom, oninput: e => { Q.custom = e.target.value; saveQ(); syncBtn(); }, onchange: () => fillPages() });
   const periodBox = h('div'), hintBox = h('div'), pagesBox = h('div'), classBox = h('div');
+  // Nút tải phân phối chương trình ngay tại Trang chủ
+  const ppMsg = h('div', { class: 'small' });
+  const ppIn = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.docx,.pdf,.pptx,.txt', hidden: true, onchange: async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    ppMsg.className = 'small'; ppMsg.textContent = 'Đang đọc ' + file.name + '…';
+    try {
+      const r = await ppctParse(file, Q.grade);
+      if (!r.ls.length) { ppMsg.className = 'ferr'; ppMsg.textContent = 'Chưa nhận ra tên bài trong tệp ' + file.name + '. Thầy cô bấm "Xem / sửa danh sách" để chọn cột tên bài hoặc dán danh sách bài.'; return; }
+      const had = (S.ppct[key()] || []).length;
+      S.ppct[key()] = r.ls; LS.set('dh.ppct', S.ppct); fillLessons();
+      ppMsg.textContent = (had ? 'Đã thay danh sách cũ: ' : 'Đã lưu ') + r.ls.length + ' bài của ' + Q.subject + ' ' + Q.grade + (r.from ? ' (đọc từ ' + r.from + ')' : '') + '. Thầy cô bấm ô Tên bài để chọn; nếu danh sách chưa đúng, bấm "Xem / sửa danh sách".';
+    } catch (err) { ppMsg.className = 'ferr'; ppMsg.textContent = 'Không đọc được tệp ' + file.name + ': ' + (err.message || 'lỗi') + '.'; }
+  } });
   function fillLessons() {
     list = (S.ppct[key()] || []).map(x => Object.assign({}, x));
     (S.matLessons[key()] || []).forEach(l => { if (!list.some(x => norm(x.t) === norm(l.t))) list.push(Object.assign({}, l)); });
@@ -2483,7 +2510,11 @@ function vHome() {
     lessonSel.innerHTML = '';
     lessonSel.append(h('option', { value: '' }, !Q.subject || !Q.grade ? '— Chọn môn và khối trước —' : list.length ? '— Bấm để chọn bài (' + list.length + ' bài) —' : '— Chưa có danh sách bài của môn này —'), ...list.map(l => h('option', { value: l.t, selected: Q.lesson === l.t }, (l.have ? '✓ ' : '') + l.t)), h('option', { value: '__custom', selected: Q.lesson === '__custom' }, '✎ Gõ tên bài khác…'));
     hintBox.innerHTML = '';
-    if (Q.subject && Q.grade && !(S.ppct[key()] || []).length && !(S.matLessons[key()] || []).length) hintBox.append(h('div', { class: 'small muted' }, 'Muốn ô Tên bài sổ ra đủ danh sách bài của ' + Q.subject + ' ' + Q.grade + '? ', h('button', { class: 'btn', type: 'button', onclick: () => goHelp('ppct') }, 'Tải / dán phân phối chương trình')));
+    const nPP = (S.ppct[key()] || []).length;
+    hintBox.append(h('div', { class: 'f' }, h('span', null, 'Phân phối chương trình (tệp Word, Excel, PDF đều được) – tải một lần cho môn và khối này'),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return fieldErr(!Q.subject ? v.querySelector('#q-sub') : gradeSel, 'Thầy cô chọn ' + (!Q.subject ? 'môn học' : 'khối') + ' ở ô này trước, rồi mới tải phân phối chương trình.'); ppIn.click(); } }, 'Tải phân phối chương trình lên'), ppIn,
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('ppct') }, 'Xem / sửa danh sách')),
+      h('span', { class: 'small muted' }, !Q.subject || !Q.grade ? 'Chọn môn và khối trước khi tải.' : nPP ? 'Đã có ' + nPP + ' bài của ' + Q.subject + ' ' + Q.grade + '.' : 'Chưa có danh sách bài của ' + Q.subject + ' ' + Q.grade + '. Tải lên thì ô Tên bài sẽ sổ ra đủ các bài.'), ppMsg));
     syncLesson();
   }
   // Nút chính đổi theo trạng thái của bài đang chọn
