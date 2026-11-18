@@ -2469,7 +2469,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2319';
+const BUILD = '2026.11.18-2323';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4298,15 +4298,21 @@ function vPeer() {
 
   // --- soạn phiếu ---
   const critBox = h('div', { style: { display: 'grid', gap: '8px' } }), totalEl = h('b'), overEl = h('div', { class: 'ferr' }), err =h('div', { class: 'ferr', role: 'alert' }), outBox = h('div');
+  // Một ô lớn để gõ hoặc dán tất cả tiêu chí: mỗi dòng là một tiêu chí (cuối dòng có "(2 điểm)" hoặc "| 2" thì lấy luôn điểm đó)
+  D.crit = D.crit.filter(c => String(c.t || '').trim()); dgSplit(D.crit);
+  const critTa = h('textarea', { id: 'dg-crit', rows: 7, 'aria-label': 'Các tiêu chí, mỗi dòng một tiêu chí', placeholder: 'Mỗi dòng một tiêu chí, ví dụ:\nMở tệp THXanh.xlsx\nNhập công thức C4*D4 vào ô E4\nĐịnh dạng chữ đậm và màu nền vàng\nLưu lại kết quả', style: { fontFamily: 'var(--f-body)', fontSize: '15px', minHeight: '170px' },
+    oninput: e => {
+      const old = D.crit;
+      D.crit = e.target.value.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map((l, i) => { const m = l.match(/^(.*?)[|\t(]\s*([\d.,]+)\s*(?:điểm|đ)?\s*\)?\s*$/i); if (m && m[1].trim()) return { t: m[1].trim(), p: clamp(Math.round((parseFloat(m[2].replace(',', '.')) || 1) * 4) / 4, 0.25, 10), m: true }; return old[i] && old[i].m ? { t: l, p: old[i].p, m: true } : { t: l }; });
+      dgSplit(D.crit); keep(); drawCrit();
+    } });
+  critTa.value = D.crit.map(c => c.t).join('\n');
   const drawCrit = () => {
+    // Danh sách điểm của từng tiêu chí đã gõ trong ô lớn phía trên
     critBox.innerHTML = '';
-    D.crit.forEach((c, i) => critBox.append(h('div', { class: 'dgrow' }, h('b', { class: 'muted' }, (i + 1) + '.'),
-      h('input', { type: 'text', placeholder: 'Nội dung tiêu chí, VD: Nhập công thức =C4*D4 vào ô E4', value: c.t, 'aria-label': 'Tiêu chí ' + (i + 1), oninput: e => { c.t = e.target.value; keep(); drawPrev(); },
-        onkeydown: e => { if (e.key !== 'Enter' || e.isComposing) return; e.preventDefault(); if (i === D.crit.length - 1) { D.crit.push({ t: '' }); dgSplit(D.crit); keep(); drawCrit(); } const ins = critBox.querySelectorAll('input[type=text]'); if (ins[i + 1]) ins[i + 1].focus(); },
-        onpaste: e => { const t = (e.clipboardData || window.clipboardData).getData('text'); const ls = t.split(/\r?\n/).map(s => s.trim()).filter(Boolean); if (ls.length < 2) return; e.preventDefault(); const rows = ls.map(l => { const m = l.match(/^(.*?)[|\t(]\s*([\d.,]+)\s*(?:điểm|đ)?\s*\)?\s*$/i); return m && m[1].trim() ? { t: m[1].trim(), p: clamp(Math.round((parseFloat(m[2].replace(',', '.')) || 1) * 4) / 4, 0.25, 10), m: true } : { t: l }; }); D.crit.splice(i, c.t ? 0 : 1, ...rows); dgSplit(D.crit); keep(); drawCrit(); } }),
+    D.crit.forEach((c, i) => critBox.append(h('div', { class: 'dgrow' }, h('b', { class: 'muted' }, (i + 1) + '.'), h('span', null, c.t),
       h('select', { 'aria-label': 'Điểm tiêu chí ' + (i + 1), onchange: e => { if (e.target.value === 'auto') delete c.m; else { c.m = true; c.p = +e.target.value; } dgSplit(D.crit); keep(); drawCrit(); } },
-        h('option', { value: 'auto', selected: !c.m }, 'Tự chia: ' + fmtNum(c.p)), PTS.map(x => h('option', { value: x, selected: !!c.m && c.p === x }, fmtNum(x) + ' điểm'))),
-      h('button', { class: 'btn danger small', type: 'button', onclick: () => { D.crit.splice(i, 1); if (!D.crit.length) D.crit.push({ t: '' }); dgSplit(D.crit); keep(); drawCrit(); } }, 'Xóa'))));
+        h('option', { value: 'auto', selected: !c.m }, 'Tự chia: ' + fmtNum(c.p)), PTS.map(x => h('option', { value: x, selected: !!c.m && c.p === x }, fmtNum(x) + ' điểm'))))));
     const tot = dgTotal(D.crit); totalEl.textContent = fmtNum(tot) + '/10'; totalEl.className = tot > 10.001 ? 'lowsc' : '';
     overEl.textContent = tot > 10.001 ? 'Tổng điểm đang vượt 10. Thầy cô giảm điểm ở một tiêu chí, hoặc chọn "Tự chia".' : '';
     drawPrev();
@@ -4315,7 +4321,7 @@ function vPeer() {
   const prevBox = h('div', { style: { minWidth: '0', maxWidth: '100%', overflow: 'hidden' } });
   const drawPrev = () => {
     prevBox.innerHTML = ''; const live = D.crit.filter(c => String(c.t || '').trim()), lv = D.levels.filter(l => String(l[0]).trim());
-    prevBox.append(h('div', { class: 'small muted', style: { marginBottom: '6px' } }, live.length ? 'Phiếu học sinh sẽ có ' + live.length + ' dòng tiêu chí như sau (xem trước, chưa bấm được):' : 'Thầy cô gõ tiêu chí vào các ô ở trên: mỗi ô một tiêu chí, nhấn Enter để sang dòng mới. Lưới chấm sẽ hiện ở đây.'));
+    prevBox.append(h('div', { class: 'small muted', style: { marginBottom: '6px' } }, live.length ? 'Phiếu học sinh sẽ có ' + live.length + ' dòng tiêu chí như sau (xem trước, chưa bấm được):' : 'Thầy cô gõ tiêu chí vào ô ở trên, mỗi dòng một tiêu chí. Lưới chấm của học sinh sẽ hiện ở đây.'));
     if (!live.length) return;
     prevBox.append(h('div', { class: 'scroll dgwrap' }, h('table', { class: 'dggrid dgprev' },
       h('thead', null, h('tr', null, h('th'), lv.map(l => h('th', null, l[0], h('div', { class: 'muted' }, +l[1] === 100 ? '(trọn điểm)' : +l[1] === 0 ? '(0 điểm)' : '(đạt ' + fmtNum(+l[1]) + '%)'))))),
@@ -4386,8 +4392,8 @@ function vPeer() {
       h('label', { class: 'row small', style: { alignSelf: 'end', minHeight: '40px' } }, h('input', { type: 'checkbox', id: 'dg-self', checked: D.self, onchange: e => { D.self = e.target.checked; keep(); } }), 'Cho phép tự đánh giá nhóm mình')),
     clsNote, grpBox,
     h('div', { style: { display: 'grid', gap: '8px' } }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Tiêu chí và điểm tối đa'), h('span', { class: 'small muted' }, 'Tổng điểm: '), totalEl),
-      h('div', { class: 'small muted' }, 'Mỗi ô một tiêu chí; gõ xong nhấn Enter để sang tiêu chí tiếp theo (hoặc bấm "+ Thêm tiêu chí"). Tổng điểm là 10: thêm hay bớt tiêu chí thì app tự chia đều điểm. Muốn tiêu chí nào nặng hơn, thầy cô bấm ô bên phải để chọn điểm; phần còn lại app chia cho các tiêu chí khác. Có thể dán cả danh sách tiêu chí từ Word/Excel vào ô đầu tiên.'),
-      critBox, overEl, h('div', null, h('button', { class: 'btn', type: 'button', onclick: () => { D.crit.push({ t: '' }); dgSplit(D.crit); keep(); drawCrit(); const ins = critBox.querySelectorAll('input[type=text]'); ins[ins.length - 1].focus(); } }, '+ Thêm tiêu chí')), prevBox),
+      h('div', { class: 'small muted' }, 'Gõ hoặc dán tất cả tiêu chí vào ô dưới đây, mỗi dòng một tiêu chí (gõ xong một tiêu chí thì nhấn Enter xuống dòng). Tổng điểm là 10, app tự chia đều; muốn tiêu chí nào nặng hơn thì chọn điểm ở danh sách bên dưới.'),
+      critTa, critBox, overEl, prevBox),
     h('details', { class: 'adv' }, h('summary', null, 'Các mức đánh giá (đang dùng 5 mức: 100% – 80% – 50% – 35% – 0%)'), h('div', null, h('p', { class: 'small muted' }, 'Học sinh bấm một mức cho mỗi tiêu chí; điểm = điểm tối đa × phần trăm của mức. Xóa trắng tên mức nào thì bỏ mức đó.'), lvBox)),
     err, h('div', { class: 'row' }, makeBtn, h('button', { class: 'btn', onclick: () => { err.textContent = ''; const d = read(); if (typeof d === 'string') { err.textContent = d; return; } preview(d); } }, 'Xem thử như học sinh')), outBox));
 
