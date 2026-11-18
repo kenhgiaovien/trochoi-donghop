@@ -939,7 +939,9 @@ function libTable(list) {
         h('td', null, h('div', { class: 'row', style: { flexWrap: 'nowrap' } },
           h('button', { class: 'btn', onclick: () => { S.current = p.id; go('hub'); } }, 'Chơi'),
           h('button', { class: 'btn', onclick: () => go('editor', p.id) }, 'Sửa'),
-          h('button', { class: 'btn', onclick: () => openShare(p) }, 'Giao bài'))));
+          h('button', { class: 'btn', onclick: () => openShare(p) }, 'Giao bài'),
+          h('button', { class: 'btn', title: 'In phiếu bài tập giấy kèm trang đáp án', onclick: () => printPack(p) }, 'In phiếu'),
+          h('button', { class: 'btn', title: 'Tạo một bản sao để sửa thành bài mới', onclick: () => { const cp = JSON.parse(JSON.stringify(p)); Object.assign(cp, { id: uid(), demo: false, title: (p.title || p.lesson || 'Bài') + ' (bản sao)', status: 'Chờ duyệt' }); savePack(cp); toast('Đã nhân bản. Đang mở bản sao để sửa.'); go('editor', cp.id); } }, 'Nhân bản'))));
     }))));
 }
 function vLibrary() {
@@ -1302,7 +1304,16 @@ function runGame(stage, def, pack, o) {
   let pauseAt = 0; const veil = h('div', { class: 'pause', hidden: true }, h('div', { style: { fontFamily: 'var(--f-display)', fontSize: 'clamp(30px,5vw,56px)', fontWeight: 800 } }, 'ĐANG TẠM DỪNG'), h('div', { style: { fontSize: '20px' } }, 'Thầy cô giảng giải hoặc cho lớp thảo luận. Đồng hồ và trò chơi đang đứng yên.'), h('button', { class: 'sbtn go', style: { fontSize: '22px', padding: '12px 36px' }, onclick: () => setPause(false) }, '▶ Tiếp tục'));
   const setPause = v => { if (c.ended || v === !!c.paused) return; c.paused = v; veil.hidden = !v; pz.textContent = v ? '▶ Tiếp tục' : 'Tạm dừng'; if (v) pauseAt = Date.now(); else c.t0 += Date.now() - pauseAt; };
   pz.onclick = () => setPause(!c.paused);
-  hudM.append(prog, score, clock, pz, snd, fs);
+  // Đọc to câu hỏi đang hiện (giọng đọc có sẵn của máy), giúp học sinh đọc chậm
+  const rd = h('button', { class: 'hb', type: 'button', title: 'Đọc to câu hỏi đang hiện; bấm lần nữa để dừng', hidden: !('speechSynthesis' in window) || def.kind === 'tool', onclick: () => {
+    const ss = window.speechSynthesis; if (ss.speaking) { ss.cancel(); return; }
+    const q = c.arena.querySelector('.qtext'); if (!q) return toast('Màn này không có câu hỏi để đọc');
+    const vi = ss.getVoices().find(x => /^vi/i.test(x.lang)); if (!vi && ss.getVoices().length) return toast('Máy này chưa cài giọng đọc tiếng Việt', 4000);
+    const opts = [...c.arena.querySelectorAll('.opt')].map((o, i) => { const k = o.querySelector('.k'); return 'ABCDEFGH'[i] + '. ' + o.textContent.slice(k ? k.textContent.length : 0); });
+    const u = new SpeechSynthesisUtterance([q.textContent].concat(opts).join('. ')); u.lang = 'vi-VN'; if (vi) u.voice = vi; u.rate = 0.95; ss.speak(u);
+  } }, 'Đọc to');
+  if ('speechSynthesis' in window) c._clean.push(() => window.speechSynthesis.cancel());
+  hudM.append(prog, score, clock, rd, pz, snd, fs);
   c.arena = h('div', { class: 'arena' });
   stage.innerHTML = ''; stage.append(h('div', { class: 'hud' }, h('div', { class: 't' }, def.name), hudM), c.arena, veil);
   c.hud = ({ progress, points, timeText } = {}) => {
@@ -2450,7 +2461,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2239';
+const BUILD = '2026.11.18-2249';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4483,6 +4494,57 @@ function vPeerJoin() {
   return v;
 }
 { const __vJoinDg = vJoin; vJoin = function () { return S.shared && S.shared.kind === 'dg' ? vPeerJoin() : __vJoinDg.apply(this, arguments); }; }
+
+/* ===== In phiếu bài tập giấy từ một bài đã lưu (kèm trang đáp án cho giáo viên) ===== */
+function printPack(p) {
+  const D = parsePack(p), esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const L = 'ABCDEFGH', parts = [], keys = []; let no = 0;
+  const sec = t => '<h2>' + (++no) + '. ' + t + '</h2>';
+  // Trong bài, đáp án đúng thường được gõ đầu tiên: phải đảo vị trí các phương án trước khi in
+  D.q = D.q.map(q => { const ord = shuffle(q.opts.map((_, i) => i)); return Object.assign({}, q, { opts: ord.map(i => q.opts[i]), ans: q.ans.map(a => ord.indexOf(a)).sort((a, b) => a - b) }); });
+  if (D.q.length) {
+    parts.push(sec('Trắc nghiệm') + '<ol class="q">' + D.q.map(q => '<li><div>' + esc(q.q) + (q.ans.length > 1 ? ' <i>(chọn nhiều đáp án)</i>' : '') + '</div><div class="opts">' + q.opts.map((o, i) => '<span><b>' + L[i] + '.</b> ' + esc(o) + '</span>').join('') + '</div></li>').join('') + '</ol>');
+    keys.push('<h3>Trắc nghiệm</h3><div class="key">' + D.q.map((q, i) => '<span>' + (i + 1) + ' – ' + q.ans.map(a => L[a]).join(', ') + '</span>').join('') + '</div>');
+  }
+  if (D.tf.length) {
+    parts.push(sec('Đúng hay sai? Ghi Đ hoặc S vào ô') + '<ol class="q">' + D.tf.map(s => '<li class="tf"><span class="box"></span>' + esc(s.s) + '</li>').join('') + '</ol>');
+    keys.push('<h3>Đúng / sai</h3><div class="key">' + D.tf.map((s, i) => '<span>' + (i + 1) + ' – ' + (s.v ? 'Đ' : 'S') + '</span>').join('') + '</div>');
+  }
+  if (D.pairs.length >= 2) {
+    const right = D.pairs.map((x, i) => ({ t: x.b, i })).sort((a, b) => a.t.localeCompare(b.t, 'vi'));
+    parts.push(sec('Nối cột A với cột B') + '<table class="pair"><tr><th>Cột A</th><th>Cột B</th></tr>' + D.pairs.map((x, i) => '<tr><td>' + (i + 1) + '. ' + esc(x.a) + '</td><td>' + L[i % 8].toLowerCase() + (i >= 8 ? Math.floor(i / 8) : '') + '. ' + esc(right[i].t) + '</td></tr>').join('') + '</table>');
+    keys.push('<h3>Nối cột</h3><div class="key">' + D.pairs.map((x, i) => { const k = right.findIndex(r => r.i === i); return '<span>' + (i + 1) + ' – ' + L[k % 8].toLowerCase() + (k >= 8 ? Math.floor(k / 8) : '') + '</span>'; }).join('') + '</div>');
+  }
+  if (D.cloze.blanks.length) {
+    let k = 0;
+    parts.push(sec('Điền vào chỗ trống') + '<p class="cloze">' + D.cloze.parts.map(x => typeof x === 'object' ? '(' + (++k) + ') <span class="gap"></span>' : esc(x)).join('') + '</p><p class="bank"><b>Từ gợi ý:</b> ' + D.cloze.blanks.slice().sort((a, b) => a.localeCompare(b, 'vi')).map(esc).join(' · ') + '</p>');
+    keys.push('<h3>Điền khuyết</h3><div class="key">' + D.cloze.blanks.map((b, i) => '<span>(' + (i + 1) + ') ' + esc(b) + '</span>').join('') + '</div>');
+  }
+  if (D.seq.length >= 3) {
+    const mixed = D.seq.map((x, i) => ({ t: x.text, i })).sort((a, b) => a.t.localeCompare(b.t, 'vi'));
+    parts.push(sec('Đánh số thứ tự đúng vào ô') + '<ol class="q none">' + mixed.map(x => '<li class="tf"><span class="box"></span>' + esc(x.t) + '</li>').join('') + '</ol>');
+    keys.push('<h3>Thứ tự</h3><div class="key">' + D.seq.map((x, i) => '<span>' + (i + 1) + '. ' + esc(x.text) + '</span>').join('') + '</div>');
+  }
+  if (!parts.length) return toast('Bài này chưa có nội dung để in.');
+  const title = esc(p.title || p.lesson || 'Phiếu bài tập');
+  const html = '<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>' + title + '</title><style>' +
+    '@page{size:A4;margin:16mm 15mm}body{font-family:"Times New Roman",serif;font-size:13pt;line-height:1.45;color:#000}h1{font-size:16pt;text-align:center;margin:6pt 0 2pt}h2{font-size:13pt;margin:12pt 0 4pt}h3{font-size:12pt;margin:10pt 0 3pt}' +
+    '.top{display:flex;justify-content:space-between;font-size:12pt}.info{margin:8pt 0;display:flex;gap:18pt}.info span{flex:1;border-bottom:1px dotted #000;min-height:16pt}' +
+    'ol.q{margin:0;padding-left:20pt}ol.q.none{list-style:none;padding-left:0}ol.q li{margin:5pt 0;break-inside:avoid}.opts{display:grid;grid-template-columns:1fr 1fr;gap:2pt 14pt;margin-top:2pt}' +
+    '.tf{display:flex;gap:8pt;align-items:flex-start}.box{flex:none;display:inline-block;width:16pt;height:16pt;border:1px solid #000;margin-top:2pt}' +
+    'table.pair{width:100%;border-collapse:collapse}table.pair td,table.pair th{border:1px solid #000;padding:4pt 6pt;vertical-align:top;width:50%}' +
+    '.gap{display:inline-block;min-width:70pt;border-bottom:1px dotted #000}.cloze{text-align:justify;line-height:1.9}.key{display:flex;flex-wrap:wrap;gap:4pt 16pt}.keypage{break-before:page}' +
+    '</style></head><body><div class="top"><span>TRƯỜNG THCS ĐỒNG HỢP</span><span>' + esc([p.subject, p.grade ? 'Lớp ' + p.grade : ''].filter(Boolean).join(' – ')) + '</span></div><h1>PHIẾU BÀI TẬP</h1><h1 style="font-size:14pt">' + title + '</h1>' +
+    '<div class="info">Họ và tên: <span></span> Lớp: <span style="flex:.35"></span> Điểm: <span style="flex:.3"></span></div>' + parts.join('') +
+    '<div class="keypage"><h1>ĐÁP ÁN (dành cho giáo viên)</h1><h1 style="font-size:14pt">' + title + '</h1>' + keys.join('') + '</div></body></html>';
+  // In qua một khung ẩn để không bị chặn cửa sổ bật lên
+  document.querySelectorAll('iframe.printer').forEach(x => x.remove());
+  const fr = h('iframe', { class: 'printer', title: 'Phiếu bài tập', style: { position: 'fixed', right: 0, bottom: 0, width: '0', height: '0', border: 0 } });
+  document.body.append(fr);
+  try { const doc = fr.contentWindow.document; doc.open(); doc.write(html); doc.close(); setTimeout(() => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast('Trình duyệt không cho in ở đây. Thầy cô mở bản web của trường để in.', 5000); } }, 300); }
+  catch (e) { toast('Trình duyệt không cho in ở đây. Thầy cô mở bản web của trường để in.', 5000); }
+  return html;
+}
 
 /* ===== THỨ TỰ (4 trò) ===== */
 defGame({ id: 's1', kind: 'seq', endOK: true, name: 'Sắp xếp thứ tự', ab: 'SX', desc: 'Đổi chỗ các mục để xếp đúng trình tự.', how: 'Bấm một mục rồi bấm mục khác để đổi chỗ (hoặc dùng nút ▲ ▼). Xếp xong bấm Kiểm tra.',
