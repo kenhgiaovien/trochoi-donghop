@@ -20,14 +20,14 @@
 <style>
 /* Layout: a teacher's workbench (light, calm) around a chalkboard stage (dark, projector-sized) where games run. */
 :root{
-  --paper:#F3F2FB; --card:#FFFFFF; --ink:#1B1B3A; --muted:#5E6082; --line:#DDDCF0; --soft:#ECEBFA;
-  --accent:#5B3FE4; --accent-ink:#FFFFFF; --sun:#FFB81C; --coral:#F0506E; --leaf:#12B886; --sky:#1C9BF0; --plum:#B24BE0;
-  --ok:#12996E; --bad:#D93A4E; --warn:#B7791F;
-  --board:#4527B8; --board2:#1E1257; --chalk:#FFFFFF; --chalk-dim:#D5CCFF;
-  --grad:linear-gradient(120deg,#4B2FD9 0%,#7A3FF2 52%,#D9469A 100%); --grad2:linear-gradient(120deg,#4B2FD9,#7A3FF2);
+  --paper:#F0F2F5; --card:#FFFFFF; --ink:#1C1E21; --muted:#65676B; --line:#DADDE1; --soft:#E4E6EB;
+  --accent:#1877F2; --accent-ink:#FFFFFF; --sun:#FFB81C; --coral:#F0506E; --leaf:#42B72A; --sky:#1C9BF0; --plum:#B24BE0;
+  --ok:#2F9E44; --bad:#E41E3F; --warn:#B7791F;
+  --board:#1A5FC4; --board2:#0B2F66; --chalk:#FFFFFF; --chalk-dim:#CFE1FB;
+  --grad:linear-gradient(120deg,#1877F2 0%,#0E63D8 100%); --grad2:linear-gradient(120deg,#1877F2,#166FE5);
   --f-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif;
   --f-body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --r:16px; --shadow:0 1px 2px rgba(40,30,110,.06),0 8px 24px rgba(40,30,110,.08);
+  --r:16px; --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.08);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#0E141D; --card:#161F2B; --ink:#E6ECF5; --muted:#9AA6BC; --line:#2A3647; --soft:#1D2836;
@@ -172,8 +172,8 @@ table.t td.num{font-variant-numeric:tabular-nums;text-align:right}
 .ferr{color:var(--bad);font-weight:600;font-size:13.5px}
 .ferr:empty{display:none}
 /* Màu sắc: thẻ trò chơi mỗi nhóm một màu, bốn phương án trả lời bốn màu (đúng/sai vẫn có dấu ✓ ✗ kèm theo) */
-.c-q{background:linear-gradient(140deg,#6C4DF5,#4B2FD9)} .c-pairs{background:linear-gradient(140deg,#22C99A,#0E9E78)} .c-words{background:linear-gradient(140deg,#C768F0,#9A37CF)} .c-seq{background:linear-gradient(140deg,#3CB4FF,#1583DB)}
-.c-groups{background:linear-gradient(140deg,#FFA63D,#EE7A12)} .c-tf{background:linear-gradient(140deg,#FF6F8A,#E33B60)} .c-cloze{background:linear-gradient(140deg,#2CC7D6,#0D97A8)} .c-tool{background:linear-gradient(140deg,#8A8FB0,#5E6082)}
+.c-q{background:linear-gradient(140deg,#3B8DF7,#1468DB)} .c-pairs{background:linear-gradient(140deg,#22C99A,#0E9E78)} .c-words{background:linear-gradient(140deg,#C768F0,#9A37CF)} .c-seq{background:linear-gradient(140deg,#34C3D9,#0D97A8)}
+.c-groups{background:linear-gradient(140deg,#FFA63D,#EE7A12)} .c-tf{background:linear-gradient(140deg,#FF6F8A,#E33B60)} .c-cloze{background:linear-gradient(140deg,#7C8CF8,#5462D8)} .c-tool{background:linear-gradient(140deg,#8A8FB0,#5E6082)}
 .stage .opt:nth-child(4n+1){background:#E0344F}.stage .opt:nth-child(4n+2){background:#1877E6}.stage .opt:nth-child(4n+3){background:#D98E04}.stage .opt:nth-child(4n+4){background:#18A06B}
 .stage .opt{box-shadow:0 5px 0 rgba(0,0,0,.22)}
 .stage .opt.right{outline:4px solid #7CF2B0;filter:none}
@@ -234,9 +234,9 @@ nav.tabs button[aria-current="page"]{background:var(--accent);color:var(--accent
 @media (min-width:721px){nav.tabs{gap:2px}nav.tabs button{padding:7px 9px}.top .wrap{gap:10px}}
 body.kidbg #joinBtn{display:none}
 /* ===== Bộ màu mới: tím – hồng – vàng ===== */
-:root[data-theme="dark"]{--accent:#9D8CFF;--grad:linear-gradient(120deg,#3A23B0,#5F2FC4 52%,#A8347A);--grad2:linear-gradient(120deg,#6E5BF0,#9D6BFF)}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--accent:#9D8CFF;--grad:linear-gradient(120deg,#3A23B0,#5F2FC4 52%,#A8347A);--grad2:linear-gradient(120deg,#6E5BF0,#9D6BFF)}}
-.top{background:var(--grad);border-bottom:0;box-shadow:0 4px 18px rgba(60,30,160,.22)}
+:root[data-theme="dark"]{--accent:#4599FF;--grad:linear-gradient(120deg,#1A5FC4,#0F4AA3);--grad2:linear-gradient(120deg,#2D88FF,#1877F2)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--accent:#4599FF;--grad:linear-gradient(120deg,#1A5FC4,#0F4AA3);--grad2:linear-gradient(120deg,#2D88FF,#1877F2)}}
+.top{background:var(--grad);border-bottom:0;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 .top .brand b{color:#fff}
 .top .brand small{color:rgba(255,255,255,.85)}
 .top .pill{background:rgba(255,255,255,.18);color:#fff}
@@ -245,23 +245,23 @@ body.kidbg #joinBtn{display:none}
 @media (min-width:721px){
   nav.tabs button{color:rgba(255,255,255,.9)}
   nav.tabs button:hover{background:rgba(255,255,255,.18);color:#fff}
-  nav.tabs button[aria-current="page"]{background:#fff;color:#4B2FD9}
+  nav.tabs button[aria-current="page"]{background:#fff;color:var(--accent)}
 }
 .card{border-color:color-mix(in srgb,var(--line) 70%,transparent);box-shadow:var(--shadow)}
 .btn{border-radius:12px}
-.btn.primary{background:var(--grad2);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(91,63,228,.28)}
+.btn.primary{background:var(--grad2);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(24,119,242,.28)}
 .btn.sun{box-shadow:0 4px 12px rgba(255,184,28,.3)}
 .btn.leaf{box-shadow:0 4px 12px rgba(18,153,110,.25)}
-.qn{background:var(--grad2);color:#fff;box-shadow:0 4px 10px rgba(91,63,228,.3)}
+.qn{background:var(--grad2);color:#fff;box-shadow:0 4px 10px rgba(24,119,242,.3)}
 .chip[aria-pressed="true"]{background:var(--grad2);border-color:transparent;color:#fff}
 .view>h1{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;width:fit-content}
-.startcard{background:var(--grad);color:#fff;border:0;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(75,47,217,.28)}
+.startcard{background:var(--grad);color:#fff;border:0;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(24,119,242,.25)}
 .startcard::before{content:"";position:absolute;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.1);right:-110px;top:-150px;pointer-events:none}
 .startcard::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08);left:-80px;bottom:-110px;pointer-events:none}
 .startcard>*{position:relative;z-index:1}
 .startcard .muted{color:rgba(255,255,255,.88)}
 .startcard h1{color:#fff}
-.tile3{border:0;color:var(--ink);box-shadow:0 8px 20px rgba(20,10,80,.2)}
+.tile3{border:0;color:var(--ink);box-shadow:0 8px 20px rgba(0,0,0,.16)}
 .tile3:hover{transform:translateY(-4px)}
 .tile3.main{background:var(--sun);color:#2A1E00}
 .tile3.main .tico{background:rgba(255,255,255,.55);color:#2A1E00}
@@ -271,13 +271,25 @@ body.kidbg #joinBtn{display:none}
 .startcard .btn.sun:hover{background:rgba(255,255,255,.28)}
 .startcard .recent{border-top:0;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 14px}
 .startcard .recent .btn{background:#fff;border-color:#fff}
-.gcard{border-radius:14px;box-shadow:0 1px 2px rgba(40,30,110,.05);transition:transform .12s,box-shadow .12s,border-color .12s}
+.gcard{border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s,border-color .12s}
 .gcard:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:var(--shadow)}
-.gico{border-radius:12px;box-shadow:0 4px 10px rgba(40,30,110,.18)}
+.gico{border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,.18)}
 .up2>*{background:color-mix(in srgb,var(--accent) 5%,var(--card))}
 table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(--accent)}
 .note{border-radius:0 12px 12px 0}
 .door.t{background:var(--grad);border:0}
+/* Bảng điểm gọn */
+.scf{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.3fr);gap:12px}
+@media (max-width:720px){.scf{grid-template-columns:1fr}}
+table.sct td,table.sct th{white-space:nowrap}
+table.sct td:nth-child(2){white-space:normal;min-width:170px;font-weight:600}
+table.sct th.num{text-align:right;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+table.sct tbody tr:nth-child(even){background:color-mix(in srgb,var(--accent) 3%,var(--card))}
+table.sct tr.nodone td{color:var(--muted);font-weight:400}
+.lowsc{color:var(--bad)}
+.scorecard:fullscreen{overflow:auto;padding:28px;font-size:19px;border-radius:0}
+.scorecard:fullscreen table.t{font-size:19px}
+.scorecard:fullscreen .kpi b{font-size:44px}
 nav.tabs .morebtn{display:none}
 @media (max-width:720px){
   body:not(.kidbg) nav.tabs button.more{display:none}
@@ -2393,7 +2405,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2203';
+const BUILD = '2026.11.18-2207';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -3973,6 +3985,123 @@ pregame = function (stage, def, pack, student) {
       h('div', null, h('h2', { style: { fontSize: 'clamp(26px,3.6vw,40px)' } }, def.name), h('p', { class: 'pghow' }, def.how || def.desc)),
       h('div', { class: 'pgrow' }, h('span', { class: 'pglab' }, 'Chọn chế độ chơi'), cards), namesBox, timeBox, fair,
       h('div', null, h('button', { class: 'sbtn go', style: { fontSize: '22px', padding: '14px 44px' }, onclick: () => runGame(stage, def, pack, { teams: M.teams ? M.names.slice(0, M.teams).map(n => ({ name: n, score: 0 })) : null, time: timed ? M.time : (+pack.time || 20), student: false }) }, 'BẮT ĐẦU')))));
+};
+
+/* ===== Bảng điểm (bản gọn): xem theo từng lớp, mỗi học sinh một dòng; từng lượt làm xem ở chế độ riêng ===== */
+vScores = function () {
+  const v = h('div', { class: 'view' });
+  const plain = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+  const clsAll = () => [...new Set(S.results.map(r => r.cls))].sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+  const latest = S.results.slice().sort((a, b) => b.at - a.at)[0];
+  // Mặc định mở đúng lớp vừa có kết quả gần nhất, không trộn các lớp vào nhau
+  let fc = S.scoreCls != null && (S.scoreCls === '' || clsAll().includes(S.scoreCls)) ? S.scoreCls : (latest ? latest.cls : '');
+  let fp = S.scorePack || '', when = S.scoreWhen || 'all', mode = S.scoreMode || 'sum', kw = '';
+  const since = () => when === 'today' ? new Date().setHours(0, 0, 0, 0) : when === 'week' ? Date.now() - 7 * 864e5 : 0;
+  const scoped = () => S.results.filter(r => (!fc || r.cls === fc) && r.at >= since());
+  const rows = () => scoped().filter(r => !fp || r.title === fp);
+
+  // --- thanh trên cùng: tải kết quả học sinh nộp qua link ---
+  const pullMsg = h('span', { class: 'small muted' });
+  const pull = async () => { pullMsg.textContent = 'Đang tải kết quả học sinh đã nộp…'; try { const r = await cloudPull(); pullMsg.textContent = r.added ? 'Có ' + r.added + ' kết quả mới.' : 'Không có kết quả mới.'; if (r.added && S.view === 'scores') render(); } catch (e) { pullMsg.textContent = 'Chưa tải được – kiểm tra mạng.'; } };
+  const canPull = typeof fbOn === 'function' && fbOn();
+  if (canPull) { if (!S.pulledAt || Date.now() - S.pulledAt > 20000) { S.pulledAt = Date.now(); pull(); } else pullMsg.textContent = 'Kết quả học sinh nộp qua link tự về đây.'; }
+  v.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Bảng điểm'), pullMsg, canPull ? h('button', { class: 'btn primary', onclick: pull }, 'Tải kết quả mới') : null));
+
+  // --- bộ lọc ---
+  const clsBox = h('div', { class: 'chips' }), packSel = h('select', { id: 'sp', onchange: e => { fp = S.scorePack = e.target.value; draw(); } });
+  const whenSel = h('select', { id: 'sw', onchange: e => { when = S.scoreWhen = e.target.value; fillPacks(); draw(); } }, [['all', 'Mọi thời gian'], ['today', 'Hôm nay'], ['week', '7 ngày gần đây']].map(([k, t]) => h('option', { value: k, selected: when === k }, t)));
+  const kwIn = h('input', { type: 'search', id: 'sk', placeholder: 'Tìm tên học sinh…', oninput: e => { kw = plain(e.target.value.trim()); draw(); } });
+  const modeSeg = h('div', { class: 'seg' }, [['sum', 'Mỗi học sinh một dòng'], ['log', 'Từng lượt làm']].map(([k, t]) => h('button', { type: 'button', 'data-m': k, 'aria-pressed': mode === k, onclick: () => { mode = S.scoreMode = k; modeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === k)); draw(); } }, t)));
+  function fillCls() {
+    clsBox.innerHTML = '';
+    const chip = (val, label) => h('button', { type: 'button', class: 'chip', 'aria-pressed': fc === val, onclick: () => { fc = S.scoreCls = val; fillCls(); fillPacks(); draw(); } }, label);
+    clsAll().forEach(c => clsBox.append(chip(c, 'Lớp ' + c + ' · ' + new Set(S.results.filter(r => r.cls === c).map(r => r.name + '|' + r.stt)).size + ' HS')));
+    if (clsAll().length > 1) clsBox.append(chip('', 'Tất cả lớp'));
+  }
+  function fillPacks() {
+    const ts = [...new Set(scoped().slice().sort((a, b) => b.at - a.at).map(r => r.title))];
+    if (fp && !ts.includes(fp)) fp = S.scorePack = '';
+    packSel.innerHTML = ''; packSel.append(h('option', { value: '' }, 'Tất cả bài (' + ts.length + ')'), ...ts.map(t => h('option', { value: t, selected: t === fp }, t)));
+  }
+
+  // --- bảng ---
+  const out = h('div', { style: { display: 'grid', gap: '12px' } });
+  const calc = () => LS.get('dh.calc', 'max');
+  const cell = x => x == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: x >= 5 ? '' : 'lowsc' }, fmtNum(x, 1)));
+  function sumTable(c, rs) {
+    const kt = rs.filter(isKT), titles = [...new Set(kt.slice().sort((a, b) => a.at - b.at).map(r => r.title))];
+    const ros = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [];
+    const mine = (name, i) => kt.filter(r => r.stt && ros.length ? r.stt === i + 1 : r.name === name);
+    const people = ros.map((name, i) => ({ stt: i + 1, name, list: mine(name, i) }));
+    [...new Set(kt.filter(r => !(r.stt && ros.length) && !ros.includes(r.name)).map(r => r.name))].forEach(name => people.push({ stt: '', name, list: kt.filter(r => !(r.stt && ros.length) && r.name === name) }));
+    const shown = people.filter(p => !kw || plain(p.name).includes(kw));
+    if (!titles.length) return h('p', { class: 'muted' }, 'Lớp ' + c + ' chưa có điểm kiến thức trong phạm vi đang chọn (thành tích trò chơi và tự đánh giá xem ở "Từng lượt làm").');
+    return h('div', { class: 'scroll' }, h('table', { class: 't sct' },
+      h('thead', null, h('tr', null, h('th', null, 'STT'), h('th', null, 'Họ và tên'), titles.map(t => h('th', { class: 'num', title: t }, titles.length > 1 ? t : 'Điểm (thang 10)')), h('th', { class: 'num' }, 'Số lần làm'), h('th', null, 'Lần gần nhất'))),
+      h('tbody', null, shown.map(p => {
+        const last = p.list.slice().sort((a, b) => b.at - a.at)[0];
+        return h('tr', { class: p.list.length ? '' : 'nodone' }, h('td', { class: 'num' }, p.stt), h('td', null, p.name),
+          titles.map(t => cell(scoreOf(p.list.filter(r => r.title === t), calc()))),
+          h('td', { class: 'num' }, p.list.length || ''), h('td', { class: 'small' }, last ? fmtDate(last.at) : h('span', { class: 'muted' }, 'chưa làm')));
+      }))));
+  }
+  function logTable(rs) {
+    const list = rs.filter(r => !kw || plain(r.name).includes(kw)).sort((a, b) => a.cls.localeCompare(b.cls, 'vi', { numeric: true }) || (a.stt - b.stt) || a.name.localeCompare(b.name, 'vi') || a.at - b.at);
+    const note = r => [r.flag ? h('span', { class: 'pill bad' }, 'mã bất thường') : null, r.tab ? h('span', { class: 'pill warn' }, 'rời trang ' + r.tab + ' lần') : null, isKT(r) ? null : h('span', { class: 'pill plain' }, LOAI[r.loai] || '')].filter(Boolean);
+    return h('div', { class: 'scroll' }, h('table', { class: 't sct' },
+      h('thead', null, h('tr', null, ['STT', 'Họ và tên'].concat(fc ? [] : ['Lớp'], ['Bài', 'Trò chơi', 'Lần', 'Điểm', 'Đúng', 'Thời gian', 'Nộp lúc', 'Ghi chú']).map(x => h('th', null, x)))),
+      h('tbody', null, list.map(r => h('tr', null, h('td', { class: 'num' }, r.stt || ''), h('td', null, r.name), fc ? null : h('td', null, r.cls), h('td', null, r.title), h('td', null, r.game), h('td', { class: 'num' }, r.lan || ''),
+        h('td', { class: 'num' }, h('b', null, fmtNum(r.sc) + '/' + r.max)), h('td', { class: 'num' }, r.c + '/' + r.n), h('td', { class: 'num' }, fmtTime(r.sec)), h('td', { class: 'small' }, fmtDate(r.at)), h('td', null, note(r)))))));
+  }
+  function draw() {
+    out.innerHTML = ''; const rs = rows();
+    if (!S.results.length) return out.append(h('p', { class: 'muted' }, 'Chưa có kết quả nào. Khi học sinh làm bài qua link thầy cô giao, điểm sẽ tự về đây.'));
+    if (!rs.length) return out.append(h('p', { class: 'muted' }, 'Không có kết quả nào trong phạm vi đang chọn.'));
+    const kt = rs.filter(isKT), people = new Set(rs.map(r => r.cls + '|' + r.name + '|' + r.stt)).size;
+    const avg = kt.length ? kt.reduce((a, r) => a + to10(r), 0) / kt.length : null;
+    const ros = fc && S.roster && S.roster.classes[fc] ? S.roster.classes[fc] : null;
+    const notDone = ros ? ros.filter((s, i) => !rs.some(r => r.stt ? r.stt === i + 1 : r.name === s.name)) : [];
+    out.append(h('div', { class: 'kpis' },
+      h('div', { class: 'kpi' }, h('b', null, people + (ros ? '/' + ros.length : '')), h('span', null, 'học sinh đã làm')),
+      h('div', { class: 'kpi' }, h('b', null, avg == null ? '–' : fmtNum(avg, 1)), h('span', null, 'điểm TB (thang 10)')),
+      h('div', { class: 'kpi' }, h('b', null, rs.length), h('span', null, 'lượt làm bài'))));
+    if (mode === 'sum') {
+      out.append(h('div', { class: 'small muted' }, 'Điểm mỗi bài: ' + CALC[calc()].toLowerCase() + ', quy về thang 10. Dấu – là chưa làm.'));
+      (fc ? [fc] : clsAll()).forEach(c => { const part = rs.filter(r => r.cls === c); if (!part.length) return; if (!fc) out.append(h('h3', null, 'Lớp ' + c)); out.append(sumTable(c, part)); });
+    } else out.append(logTable(rs));
+    const wrong = {}; rs.forEach(r => (r.wr || []).forEach(w => wrong[w] = (wrong[w] || 0) + 1));
+    const top = Object.entries(wrong).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (top.length) out.append(h('details', { class: 'adv' }, h('summary', null, 'Nội dung sai nhiều – gợi ý ôn tập'), h('div', null, top.map(([w, n]) => h('div', null, '• ' + w + '… (' + n + ' lượt sai)')))));
+    if (notDone.length) out.append(h('details', { class: 'adv' }, h('summary', null, 'Học sinh chưa làm (' + notDone.length + ')'), h('div', null, notDone.map(s => s.name).join(', '))));
+  }
+  fillCls(); fillPacks(); draw();
+  const card = h('div', { class: 'card scorecard', style: { display: 'grid', gap: '12px' } },
+    h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Xem điểm'),
+      h('button', { class: 'btn', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else if (card.requestFullscreen) card.requestFullscreen(); } }, 'Chiếu lên màn hình'),
+      h('button', { class: 'btn', onclick: () => exportDetail(rows()) }, 'Xuất chi tiết mọi lượt (Excel)')),
+    S.results.length ? h('div', { class: 'f' }, h('span', null, 'Chọn lớp'), clsBox) : null,
+    S.results.length ? h('div', { class: 'scf' }, h('label', { class: 'f' }, h('span', null, 'Bài'), packSel), h('label', { class: 'f' }, h('span', null, 'Thời gian'), whenSel), h('label', { class: 'f' }, h('span', null, 'Tìm học sinh'), kwIn)) : null,
+    S.results.length ? h('div', null, modeSeg) : null,
+    out);
+  v.append(card);
+
+  // --- xuất sổ điểm ---
+  v.append(__exportCard0(() => fc, () => fp));
+
+  // --- ít dùng: thu gọn lại ---
+  const ta = h('textarea', { id: 'kqpaste', placeholder: 'Dán các mã kết quả học sinh gửi (mỗi mã bắt đầu bằng kq-…). Dán nhiều mã cùng lúc được.', style: { minHeight: '110px' } });
+  const msg = h('p', { class: 'small' });
+  v.append(h('details', { class: 'adv' }, h('summary', null, 'Nhận mã kết quả (khi học sinh gửi mã kq-… thay vì nộp tự động)'), h('div', null, ta, h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: async () => {
+    const codes = ta.value.match(/kq-[zj][A-Za-z0-9_-]+/g) || []; const got = []; let bad = 0, warn = 0;
+    for (const cd of codes) { try { const o = await parseAnyCode(cd); const k = o.k; delete o.k; delete o._type; o.flag = k !== sum32(JSON.stringify(o)); if (o.flag) warn++; got.push(o); } catch (e) { bad++; } }
+    const added = mergeResults(got); ta.value = '';
+    msg.textContent = 'Đã thêm ' + added + ' kết quả mới' + (got.length - added ? ', bỏ qua ' + (got.length - added) + ' mã trùng' : '') + (bad ? ', ' + bad + ' mã lỗi' : '') + (warn ? ', ' + warn + ' mã có dấu hiệu bị sửa (đã đánh dấu)' : '') + '.';
+    fillCls(); fillPacks(); draw();
+  } }, 'Thêm vào bảng điểm'), msg))),
+    h('details', { class: 'adv' }, h('summary', null, 'Xóa bảng điểm'), h('div', null, h('p', { class: 'small muted' }, 'Xóa toàn bộ kết quả đang lưu trên máy này. Nên xuất Excel trước khi xóa.'),
+      h('div', null, h('button', { class: 'btn danger', onclick: e => { if (e.target.dataset.c) { S.results = []; LS.set('dh.results', []); cloudWrite(() => cDoc('results').set({ list: [] })); render(); } else { e.target.dataset.c = 1; e.target.textContent = 'Bấm lần nữa để xóa hết'; } } }, 'Xóa bảng điểm')))),
+    h('p', { class: 'small muted' }, 'Mã kết quả có mã kiểm tra để phát hiện chỉnh sửa thông thường, nhưng không thay thế được hệ thống chấm trên máy chủ. Phù hợp luyện tập và kiểm tra thường xuyên.'));
+  return v;
 };
 
 /* ===== THỨ TỰ (4 trò) ===== */
