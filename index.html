@@ -296,7 +296,9 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 .dggrid input[type=radio]{width:22px;height:22px;flex:none;accent-color:var(--accent)}
 .dggrid .mlab{display:none}
 table.dgt td.dgmb{text-align:left;vertical-align:top;line-height:1.35}
-@media (max-width:760px){.dggrid thead{display:none}.dggrid tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.dggrid tbody th{display:block;border:0;padding:4px 6px 8px;min-width:0}.dggrid td{display:block;border:0;padding:0;text-align:left}.dggrid td label{justify-content:flex-start;padding:6px}.dggrid .mlab{display:inline}}
+/* Điện thoại: vẫn là lưới như Google Form (tiêu chí theo dòng, mức theo cột), cột tiêu chí đứng yên khi vuốt ngang */
+.dggrid tbody tr:has(input:checked){background:color-mix(in srgb,var(--ok) 9%,var(--card))}
+@media (max-width:760px){.dggrid{min-width:520px;font-size:14px}.dggrid tbody th{min-width:150px;max-width:190px;position:sticky;left:0;background:var(--card);z-index:1;box-shadow:2px 0 0 var(--line)}.dggrid thead th:first-child{position:sticky;left:0;z-index:1}.dggrid th,.dggrid td{padding:8px 4px}.dggrid thead th{font-size:12px;min-width:66px}}
 .dgitem{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .dgc{display:grid;gap:8px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--card)}
 .dglv{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
@@ -2461,7 +2463,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2249';
+const BUILD = '2026.11.18-2257';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4325,7 +4327,7 @@ function vPeer() {
     if (S.dgLast !== d.aid) outBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     S.dgLast = d.aid;   // trang có vẽ lại thì khung link vẫn còn
   };
-  const preview = d => { S.shared = Object.assign({ kind: 'dg', _type: 'g', at: Date.now() }, d); S.sharedTest = true; S.student = null; go('join'); };
+  const preview = d => { S.shared = Object.assign({ kind: 'dg', _type: 'g', at: Date.now() }, d); S.sharedTest = true; S.student = null; S.dgSt = null; go('join'); };
   const makeBtn = h('button', { class: 'btn primary big', onclick: async () => {
     err.textContent = ''; const d = read(); if (typeof d === 'string') { err.textContent = d; return; }
     if (!dgOn()) { err.textContent = 'Bản này chưa gửi được phiếu qua mạng. Thầy cô mở bản web của trường để tạo link.'; return; }
@@ -4439,6 +4441,11 @@ function vPeerJoin() {
   const d = S.shared, total = dgTotal(d.crit), G = d.groups.length;
   const doneKey = 'dh.dgdone.' + (d.aid || 'thu'), done = () => LS.get(doneKey, []);
   const st = S.dgSt && S.dgSt.aid === (d.aid || 'thu') ? S.dgSt : (S.dgSt = { aid: d.aid || 'thu', me: null, to: null, s: d.crit.map(() => null), nx: '', sent: null, mem: [] });
+  // Phiếu đổi số tiêu chí/số nhóm (xem thử nhiều lần) thì bỏ các lựa chọn cũ, tránh lệch dòng và không cộng được điểm
+  if (st.s.length !== d.crit.length || st.s.some(x => x != null && !d.levels[x])) st.s = d.crit.map(() => null);
+  if (st.me != null && st.me >= G) { st.me = null; st.to = null; }
+  if (st.to != null && st.to >= G) st.to = null;
+  if (!Array.isArray(st.mem)) st.mem = [];
   const memKey = g => 'dh.dgmem.' + (d.aid || 'thu') + '.' + g;
   const v = h('div', { class: 'view kid' });
   if (S.sharedTest) v.append(h('div', null, h('button', { class: 'btn', onclick: () => { S.shared = null; S.sharedTest = false; S.dgSt = null; go('peer'); } }, '← Thoát xem thử, về trang giáo viên')));
@@ -4482,10 +4489,10 @@ function vPeerJoin() {
       catch (e) { send.disabled = false; send.textContent = 'GỬI ĐÁNH GIÁ'; err.textContent = navigator.onLine === false ? 'Chưa gửi được: máy đang mất mạng. Em kiểm tra mạng rồi bấm lại.' : 'Chưa gửi được. Em bấm lại lần nữa.'; }
     } }, 'GỬI ĐÁNH GIÁ');
     body.append(h('div', { class: 'card', style: { display: 'grid', gap: '14px' } }, h('div', { class: 'dgql', style: { marginBottom: 0 } }, 'Đánh giá ' + d.groups[st.to] + ' theo các tiêu chí sau:', h('span', { class: 'lowsc' }, ' *')),
-      h('table', { class: 'dggrid' },
+      h('div', { class: 'scroll dgwrap' }, h('table', { class: 'dggrid' },
         h('thead', null, h('tr', null, h('th'), d.levels.map(l => h('th', null, l[0], h('div', { class: 'muted' }, l[1] === 100 ? '(trọn điểm)' : l[1] === 0 ? '(0 điểm)' : '(đạt ' + fmtNum(l[1]) + '%)'))))),
         h('tbody', null, d.crit.map((c, ci) => h('tr', { class: 'dgcr' }, h('th', { scope: 'row' }, (ci + 1) + '. ' + c.t, h('span', { class: 'muted' }, ' (' + fmtNum(c.p) + ' điểm)')),
-          d.levels.map((l, li) => h('td', null, h('label', null, h('input', { type: 'radio', name: 'dgc' + ci, checked: st.s[ci] === li, 'aria-label': 'Tiêu chí ' + (ci + 1) + ': ' + l[0], onchange: () => { st.s[ci] = li; upd(); err.textContent = ''; } }), h('span', { class: 'mlab' }, l[0] + ' – ' + fmtNum(c.p * l[1] / 100, 2) + ' điểm')))))))),
+          d.levels.map((l, li) => h('td', null, h('label', null, h('input', { type: 'radio', name: 'dgc' + ci, checked: st.s[ci] === li, 'aria-label': 'Tiêu chí ' + (ci + 1) + ': ' + l[0], onchange: () => { st.s[ci] = li; upd(); err.textContent = ''; } }), h('span', { class: 'mlab' }, l[0] + ' – ' + fmtNum(c.p * l[1] / 100, 2) + ' điểm'))))))))),
       h('label', { class: 'f' }, h('span', null, 'Nhận xét cho nhóm bạn (không bắt buộc)'), h('input', { type: 'text', maxlength: 300, value: st.nx, placeholder: 'VD: Trình bày đẹp, cần lưu tệp đúng tên', oninput: e => { st.nx = e.target.value; } })),
       h('div', { class: 'row' }, h('span', null, 'Tổng điểm em chấm: '), sumEl), err, h('div', null, send)));
     upd();
