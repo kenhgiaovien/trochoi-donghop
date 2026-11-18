@@ -329,6 +329,7 @@ table.sct th.num{text-align:right;max-width:180px;overflow:hidden;text-overflow:
 table.sct tbody tr:nth-child(even){background:color-mix(in srgb,var(--accent) 3%,var(--card))}
 table.sct tr.nodone td{color:var(--muted);font-weight:400}
 .lowsc{color:var(--bad)}
+.upsc{color:var(--ok)}
 .scorecard:fullscreen{overflow:auto;padding:28px;font-size:19px;border-radius:0}
 .scorecard:fullscreen table.t{font-size:19px}
 .scorecard:fullscreen .kpi b{font-size:44px}
@@ -757,8 +758,10 @@ function mergeResults(list, push = true) {
   const key = r => [r.pk, r.name, r.cls, r.at, r.game].join('|');
   const have = new Set(S.results.map(key)); let added = 0;
   for (const r of list) if (!have.has(key(r))) { S.results.push(r); have.add(key(r)); added++; }
-  S.results.sort((a, b) => b.at - a.at); if (S.results.length > 3000) S.results.length = 3000;
-  LS.set('dh.results', S.results);
+  // Giữ đủ lượt chơi của cả một học kỳ để tổng kết chuyên cần, tiến bộ. Lượt cũ hơn 30 ngày bỏ phần "câu sai" cho nhẹ.
+  S.results.sort((a, b) => b.at - a.at); if (S.results.length > 12000) S.results.length = 12000;
+  if (S.results.length > 3000) { const old = Date.now() - 30 * 864e5; S.results.forEach(r => { if (r.at < old && r.wr) delete r.wr; }); }
+  if (!LS.set('dh.results', S.results)) { S.results.forEach(r => { delete r.wr; }); if (!LS.set('dh.results', S.results)) toast('Bộ nhớ trình duyệt đã đầy: thầy cô xuất Excel rồi xóa bớt bảng điểm cũ.', 8000); }
   if (push && added) cloudWrite(() => cDoc('results').set({ list: S.results.slice(0, 1500) }));
   return added;
 }
@@ -2447,7 +2450,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2236';
+const BUILD = '2026.11.18-2239';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4053,8 +4056,52 @@ vScores = function () {
   // --- bộ lọc ---
   const clsBox = h('div', { class: 'chips' }), packSel = h('select', { id: 'sp', onchange: e => { fp = S.scorePack = e.target.value; draw(); } });
   const whenSel = h('select', { id: 'sw', onchange: e => { when = S.scoreWhen = e.target.value; fillPacks(); draw(); } }, [['all', 'Mọi thời gian'], ['today', 'Hôm nay'], ['week', '7 ngày gần đây']].map(([k, t]) => h('option', { value: k, selected: when === k }, t)));
-  const kwIn = h('input', { type: 'search', id: 'sk', placeholder: 'Tìm tên học sinh…', oninput: e => { kw = plain(e.target.value.trim()); draw(); } });
-  const modeSeg = h('div', { class: 'seg' }, [['sum', 'Mỗi học sinh một dòng'], ['log', 'Từng lượt làm']].map(([k, t]) => h('button', { type: 'button', 'data-m': k, 'aria-pressed': mode === k, onclick: () => { mode = S.scoreMode = k; modeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === k)); draw(); } }, t)));
+  const whenLab = h('label', { class: 'f' }, h('span', null, 'Thời gian'), whenSel);
+  const kwIn =h('input', { type: 'search', id: 'sk', placeholder: 'Tìm tên học sinh…', oninput: e => { kw = plain(e.target.value.trim()); draw(); } });
+  const modeSeg = h('div', { class: 'seg' }, [['sum', 'Mỗi học sinh một dòng'], ['log', 'Từng lượt làm'], ['term', 'Tổng kết kỳ (chuyên cần, tiến bộ)']].map(([k, t]) => h('button', { type: 'button', 'data-m': k, 'aria-pressed': mode === k, onclick: () => { mode = S.scoreMode = k; modeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === k)); draw(); } }, t)));
+  // --- Tổng kết kỳ: gom các lượt chơi theo từng buổi (ngày) để xét chuyên cần và tiến bộ ---
+  const dkey = t => { const x = new Date(t); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  const dshow = k => k.slice(8) + '/' + k.slice(5, 7);
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  let tFrom = S.termFrom || '', tTo = S.termTo || '';
+  const termBox = h('div', { class: 'scf' }, h('label', { class: 'f' }, h('span', null, 'Từ ngày'), h('input', { type: 'date', id: 'st-from', value: tFrom, onchange: e => { tFrom = S.termFrom = e.target.value; draw(); } })), h('label', { class: 'f' }, h('span', null, 'Đến ngày'), h('input', { type: 'date', id: 'st-to', value: tTo, onchange: e => { tTo = S.termTo = e.target.value; draw(); } })),
+    h('div', { class: 'f' }, h('span', null, 'Tệp tổng kết'), h('div', null, h('button', { class: 'btn primary', onclick: () => exportTerm() }, 'Xuất tổng kết (Excel)'))));
+  function termData(c) {
+    const lo = tFrom ? new Date(tFrom + 'T00:00:00').getTime() : 0, hi = tTo ? new Date(tTo + 'T23:59:59').getTime() : Infinity;
+    const kt = S.results.filter(r => r.cls === c && isKT(r) && (!fp || r.title === fp) && r.at >= lo && r.at <= hi);
+    const days = [...new Set(kt.map(r => dkey(r.at)))].sort();
+    const ros = S.roster && S.roster.classes[c] ? S.roster.classes[c].map(s => s.name) : [];
+    const people = ros.map((name, i) => ({ stt: i + 1, name, list: kt.filter(r => r.stt && ros.length ? r.stt === i + 1 : r.name === name) }));
+    [...new Set(kt.filter(r => !(r.stt && ros.length) && !ros.includes(r.name)).map(r => r.name))].forEach(name => people.push({ stt: '', name, list: kt.filter(r => !(r.stt && ros.length) && r.name === name) }));
+    return { days, rows: people.map(p => {
+      const by = {}; p.list.forEach(r => (by[dkey(r.at)] = by[dkey(r.at)] || []).push(r));
+      const ds = Object.keys(by).sort(), sc = ds.map(k => scoreOf(by[k], calc())).filter(x => x != null);
+      let h1 = null, h2 = null, delta = null;
+      if (sc.length >= 4) { const m = Math.floor(sc.length / 2); h1 = mean(sc.slice(0, m)); h2 = mean(sc.slice(sc.length - m)); delta = h2 - h1; }
+      const note = !ds.length ? 'Chưa tham gia' : delta == null ? 'Chưa đủ 4 buổi để xét tiến bộ' : delta >= 1 ? 'Tiến bộ rõ' : delta >= 0.3 ? 'Có tiến bộ' : delta > -0.3 ? 'Ổn định' : delta > -1 ? 'Giảm nhẹ' : 'Giảm';
+      return { stt: p.stt, name: p.name, n: ds.length, att: days.length ? ds.length / days.length : 0, plays: p.list.length, avg: sc.length ? mean(sc) : null, h1, h2, delta, note };
+    }) };
+  }
+  const termHead = ['STT', 'Họ và tên', 'Số buổi tham gia', 'Chuyên cần', 'Số lượt chơi', 'Điểm TB', 'TB nửa đầu', 'TB nửa sau', 'Tiến bộ', 'Nhận xét'];
+  function termTable(c) {
+    const T = termData(c), shown = T.rows.filter(p => !kw || plain(p.name).includes(kw));
+    if (!T.days.length) return h('p', { class: 'muted' }, 'Lớp ' + c + ' chưa có lượt chơi nào trong khoảng thời gian đang chọn.');
+    const n1 = x => x == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, fmtNum(x, 1));
+    return h('div', { style: { display: 'grid', gap: '8px' } }, h('div', { class: 'small muted' }, 'Lớp ' + c + ': ' + T.days.length + ' buổi có bài, từ ' + dshow(T.days[0]) + ' đến ' + dshow(T.days[T.days.length - 1]) + '.'),
+      h('div', { class: 'scroll' }, h('table', { class: 't sct' }, h('thead', null, h('tr', null, termHead.map((x, i) => h('th', { class: i > 1 && i < 9 ? 'num' : '' }, x)))),
+        h('tbody', null, shown.map(p => h('tr', { class: p.n ? '' : 'nodone' }, h('td', { class: 'num' }, p.stt), h('td', null, p.name), h('td', { class: 'num' }, p.n + '/' + T.days.length),
+          h('td', { class: 'num' }, h('b', { class: p.att >= .5 ? '' : 'lowsc' }, Math.round(p.att * 100) + '%')), h('td', { class: 'num' }, p.plays || ''),
+          p.avg == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: p.avg >= 5 ? '' : 'lowsc' }, fmtNum(p.avg, 1))), n1(p.h1), n1(p.h2),
+          p.delta == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: p.delta <= -0.3 ? 'lowsc' : p.delta >= 0.3 ? 'upsc' : '' }, (p.delta > 0 ? '+' : '') + fmtNum(p.delta, 1))), h('td', { class: 'small' }, p.note)))))));
+  }
+  async function exportTerm() {
+    const cs = (fc ? [fc] : clsAll()).filter(c => termData(c).days.length);
+    if (!cs.length) return toast('Chưa có lượt chơi nào trong khoảng thời gian đang chọn');
+    const r1x = x => x == null ? '' : Math.round(x * 10) / 10;
+    const note = 'Buổi = một ngày lớp có bài. Chuyên cần = số buổi tham gia / số buổi có bài. Điểm mỗi buổi: ' + CALC[calc()].toLowerCase() + ' (thang 10). Điểm TB = trung bình các buổi đã tham gia. Tiến bộ = TB nửa sau trừ TB nửa đầu (cần từ 4 buổi).' + (fp ? ' Chỉ tính bài: ' + fp + '.' : '');
+    const sheets = cs.map(c => { const T = termData(c); return { name: c, cols: [6, 28, 16, 12, 13, 10, 12, 12, 10, 28], merges: [{ s: { r: 0, c: 0 }, e: { r: 0, c: 9 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } }], rows: [['TỔNG KẾT LƯỢT CHƠI – LỚP ' + c + ' (' + T.days.length + ' buổi, ' + dshow(T.days[0]) + ' – ' + dshow(T.days[T.days.length - 1]) + ')'], [note], [], termHead].concat(T.rows.map(p => [p.stt, p.name, p.n + '/' + T.days.length, Math.round(p.att * 100) + '%', p.plays, r1x(p.avg), r1x(p.h1), r1x(p.h2), r1x(p.delta), p.note])) }; });
+    try { await writeBook('tong-ket-' + (fc || 'cac-lop') + '.xlsx', sheets); } catch (e) { toast('Chưa tạo được tệp Excel — kiểm tra mạng rồi bấm lại'); }
+  }
   function fillCls() {
     clsBox.innerHTML = '';
     const chip = (val, label) => h('button', { type: 'button', class: 'chip', 'aria-pressed': fc === val, onclick: () => { fc = S.scoreCls = val; fillCls(); fillPacks(); draw(); } }, label);
@@ -4098,6 +4145,12 @@ vScores = function () {
   }
   function draw() {
     out.innerHTML = ''; const rs = rows();
+    termBox.hidden = mode !== 'term'; whenLab.hidden = mode === 'term';
+    if (mode === 'term' && S.results.length) {
+      out.append(h('div', { class: 'note' }, h('b', null, 'Cách tính: '), 'mỗi ngày lớp có bài tính là một buổi. Chuyên cần = số buổi em tham gia trên tổng số buổi. Điểm mỗi buổi lấy ' + CALC[calc()].toLowerCase() + ' trong ngày (thang 10); Điểm TB là trung bình các buổi đã tham gia. Tiến bộ = trung bình nửa sau trừ trung bình nửa đầu, cần từ 4 buổi trở lên. Chỉ tính điểm kiến thức.'));
+      (fc ? [fc] : clsAll()).forEach(c => { if (!fc) out.append(h('h3', null, 'Lớp ' + c)); out.append(termTable(c)); });
+      return;
+    }
     if (!S.results.length) return out.append(h('p', { class: 'muted' }, 'Chưa có kết quả nào. Khi học sinh làm bài qua link thầy cô giao, điểm sẽ tự về đây.'));
     if (!rs.length) return out.append(h('p', { class: 'muted' }, 'Không có kết quả nào trong phạm vi đang chọn.'));
     const kt = rs.filter(isKT), people = new Set(rs.map(r => r.cls + '|' + r.name + '|' + r.stt)).size;
@@ -4123,8 +4176,9 @@ vScores = function () {
       h('button', { class: 'btn', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else if (card.requestFullscreen) card.requestFullscreen(); } }, 'Chiếu lên màn hình'),
       h('button', { class: 'btn', onclick: () => exportDetail(rows()) }, 'Xuất chi tiết mọi lượt (Excel)')),
     S.results.length ? h('div', { class: 'f' }, h('span', null, 'Chọn lớp'), clsBox) : null,
-    S.results.length ? h('div', { class: 'scf' }, h('label', { class: 'f' }, h('span', null, 'Bài'), packSel), h('label', { class: 'f' }, h('span', null, 'Thời gian'), whenSel), h('label', { class: 'f' }, h('span', null, 'Tìm học sinh'), kwIn)) : null,
+    S.results.length ? h('div', { class: 'scf' }, h('label', { class: 'f' }, h('span', null, 'Bài'), packSel), whenLab, h('label', { class: 'f' }, h('span', null, 'Tìm học sinh'), kwIn)) : null,
     S.results.length ? h('div', null, modeSeg) : null,
+    S.results.length ? termBox : null,
     out);
   v.append(card);
 
