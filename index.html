@@ -289,6 +289,20 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 .dglv button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .dglv button[aria-pressed="true"] small{color:#fff}
 @media (max-width:600px){.dgrow{grid-template-columns:18px minmax(0,1fr) 64px auto}}
+table.dgt th,table.dgt td{vertical-align:middle}
+table.dgt td:first-child,table.dgt th:first-child{min-width:240px;text-align:left}
+table.dgt th.num,table.dgt td.num{text-align:center;min-width:92px}
+table.dgt th.top{background:var(--sun);color:#2A1E00}
+@media (max-width:720px){table.dgt td:first-child,table.dgt th:first-child{min-width:150px}table.dgt th.num,table.dgt td.num{min-width:70px}}
+table.dgt tr.tot td{border-top:2px solid var(--accent);font-size:1.12em}
+.dgwait{font-weight:600;color:var(--warn)} .dgwait.ok{color:var(--ok)}
+.dglegend{display:grid;gap:4px;font-size:.92em}
+.dgboard:fullscreen{font-size:22px;padding:24px 32px;align-content:start}
+.dgboard:fullscreen table.t{font-size:22px}
+.dgboard:fullscreen table.t th{font-size:18px}
+.dgboard:fullscreen table.dgt td,.dgboard:fullscreen table.dgt th{padding:12px 14px}
+.dgboard:fullscreen h3{font-size:30px}
+.dgboard:fullscreen .small{font-size:16px}
 /* Bảng điểm gọn */
 .scf{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.3fr);gap:12px}
 @media (max-width:720px){.scf{grid-template-columns:1fr}}
@@ -2416,7 +2430,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2222';
+const BUILD = '2026.11.18-2227';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4242,9 +4256,10 @@ function vPeer() {
     const d = dgList().find(x => x.aid === S.dgOpen); resBox.innerHTML = ''; if (!d) return;
     const body = h('div', { style: { display: 'grid', gap: '12px' } }, h('p', { class: 'muted' }, 'Đang tải các phiếu học sinh đã gửi…'));
     let subs = [], sum = [];
-    const card = h('div', { class: 'card scorecard', style: { display: 'grid', gap: '12px' } }, h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h3', null, 'Kết quả: ' + d.title), h('div', { class: 'small muted' }, (d.cls ? 'Lớp ' + d.cls + ' · ' : '') + 'Tổng điểm ' + fmtNum(dgTotal(d.crit)))),
-      h('button', { class: 'btn primary', onclick: drawRes }, 'Tải lại'),
-      h('button', { class: 'btn', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else if (card.requestFullscreen) card.requestFullscreen(); } }, 'Chiếu lên màn hình'),
+    const stamp = h('span', { class: 'small muted' });
+    const card = h('div', { class: 'card scorecard dgboard', style: { display: 'grid', gap: '12px' } }, h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h3', null, 'Bảng điểm đánh giá chéo: ' + d.title), h('div', { class: 'small muted' }, (d.cls ? 'Lớp ' + d.cls + ' · ' : '') + 'Tổng điểm ' + fmtNum(dgTotal(d.crit)))),
+      stamp, h('button', { class: 'btn primary', onclick: () => load(true) }, 'Tải lại'),
+      h('button', { class: 'btn sun', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else if (card.requestFullscreen) card.requestFullscreen(); } }, 'Chiếu lên tivi'),
       h('button', { class: 'btn', onclick: async () => {
         if (!subs.length) return toast('Chưa có phiếu nào để xuất');
         const total = dgTotal(d.crit), r2 = x => x == null ? '' : Math.round(x * 100) / 100;
@@ -4254,18 +4269,46 @@ function vPeer() {
         try { await writeBook('danh-gia-cheo' + (d.cls ? '-' + d.cls : '') + '.xlsx', [{ name: 'Tong hop', cols: [18].concat(d.crit.map(() => 22), [12, 12, 9, 30]), rows: [[d.title + (d.cls ? ' – Lớp ' + d.cls : '')], [], head].concat(rows1) }, { name: 'Tung phieu', cols: [18, 14, 16].concat(d.crit.map(() => 22), [10, 40]), rows: [['Thời gian', 'Nhóm chấm', 'Nhóm được chấm'].concat(d.crit.map(c => c.t), ['Tổng điểm', 'Nhận xét'])].concat(rows2) }]); } catch (e) { toast('Chưa tạo được tệp Excel — kiểm tra mạng rồi bấm lại'); }
       } }, 'Xuất Excel')), body);
     resBox.append(card); card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    try { subs = await dgPull(d); } catch (e) { body.innerHTML = ''; body.append(h('div', { class: 'note bad' }, 'Chưa tải được kết quả – kiểm tra mạng rồi bấm "Tải lại".')); return; }
-    sum = dgSummary(d, subs); body.innerHTML = '';
-    if (!subs.length) return body.append(h('p', { class: 'muted' }, 'Chưa có nhóm nào gửi phiếu. Khi học sinh gửi, bấm "Tải lại".'));
-    const num = x => x == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, fmtNum(x, 2));
-    const waiting = d.groups.filter((g, i) => !subs.some(s => s.me === i));
-    body.append(h('div', { class: 'kpis' }, h('div', { class: 'kpi' }, h('b', null, subs.length), h('span', null, 'phiếu đã gửi')), h('div', { class: 'kpi' }, h('b', null, (d.groups.length - waiting.length) + '/' + d.groups.length), h('span', null, 'nhóm đã chấm'))),
-      waiting.length ? h('div', { class: 'small muted' }, 'Chưa chấm: ' + waiting.join(', ') + '.') : null,
-      h('div', { class: 'scroll' }, h('table', { class: 't sct' }, h('thead', null, h('tr', null, h('th', null, 'Nhóm được chấm'), d.crit.map((c, i) => h('th', { class: 'num', title: c.t }, 'TC' + (i + 1) + ' (' + fmtNum(c.p) + 'đ)')), h('th', { class: 'num' }, 'Tổng'), h('th', { class: 'num' }, 'Thang 10'), h('th', { class: 'num' }, 'Số phiếu'), h('th', null, 'Nhóm đã chấm'))),
-        h('tbody', null, sum.map(g => h('tr', { class: g.n ? '' : 'nodone' }, h('td', null, h('b', null, g.name)), g.per.map(num), g.sum == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', null, fmtNum(g.sum, 2))), g.s10 == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: g.s10 >= 5 ? '' : 'lowsc' }, fmtNum(g.s10, 1))), h('td', { class: 'num' }, g.n || ''), h('td', { class: 'small' }, g.raters.join(', '))))))),
-      h('div', { class: 'small muted' }, d.crit.map((c, i) => 'TC' + (i + 1) + ': ' + c.t).join(' · ')),
-      h('div', { class: 'small muted' }, 'Một nhóm có nhiều bạn cùng chấm thì lấy trung bình các phiếu của nhóm đó trước, rồi mới lấy trung bình giữa các nhóm chấm.'),
-      sum.some(g => g.notes.length) ? h('details', { class: 'adv' }, h('summary', null, 'Nhận xét của các nhóm'), h('div', null, sum.filter(g => g.notes.length).map(g => h('div', null, h('b', null, g.name + ': '), g.notes.map(n => h('div', { class: 'small' }, '• ' + n)))))) : null);
+    const total = dgTotal(d.crit), started = Date.now();
+    // ô điểm tô đậm nhạt theo tỉ lệ đạt, để nhìn từ xa trên tivi
+    const cellOf = (x, max, strong) => x == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num', style: { background: 'color-mix(in srgb,' + (x / (max || 1) >= .5 ? 'var(--ok)' : 'var(--bad)') + ' ' + Math.round(10 + 22 * Math.abs(x / (max || 1) - .5) * 2) + '%,transparent)' } }, strong ? h('b', null, fmtNum(x, 2)) : fmtNum(x, 2));
+    function paint() {
+      const open = !!(body.querySelector('details') || {}).open;
+      body.innerHTML = '';
+      const waiting = d.groups.filter((g, i) => !subs.some(s => s.me === i)), best = Math.max.apply(null, sum.map(g => g.sum == null ? -1 : g.sum));
+      const gh = g => h('th', { class: 'num' + (g.sum != null && g.sum === best ? ' top' : '') }, g.name, g.sum != null && g.sum === best ? h('div', { class: 'small' }, '★ cao nhất') : null);
+      body.append(h('div', { class: 'kpis' }, h('div', { class: 'kpi' }, h('b', null, subs.length), h('span', null, 'phiếu đã gửi')), h('div', { class: 'kpi' }, h('b', null, (d.groups.length - waiting.length) + '/' + d.groups.length), h('span', null, 'nhóm đã chấm'))),
+        waiting.length ? h('div', { class: 'dgwait' }, 'Chưa chấm: ' + waiting.join(', ') + '.') : h('div', { class: 'dgwait ok' }, 'Tất cả các nhóm đã chấm.'));
+      if (d.groups.length <= 8) {
+        // ít nhóm: mỗi tiêu chí một dòng (đọc được nguyên văn tiêu chí), mỗi nhóm một cột
+        body.append(h('div', { class: 'scroll' }, h('table', { class: 't dgt' }, h('thead', null, h('tr', null, h('th', null, 'Tiêu chí'), h('th', { class: 'num' }, 'Điểm tối đa'), sum.map(gh))),
+          h('tbody', null, d.crit.map((c, ci) => h('tr', null, h('td', null, (ci + 1) + '. ' + c.t), h('td', { class: 'num' }, fmtNum(c.p)), sum.map(g => cellOf(g.per[ci], c.p)))),
+            h('tr', { class: 'tot' }, h('td', null, h('b', null, 'TỔNG ĐIỂM')), h('td', { class: 'num' }, h('b', null, fmtNum(total))), sum.map(g => cellOf(g.sum, total, true))),
+            h('tr', { class: 'tot' }, h('td', null, h('b', null, 'Quy về thang 10')), h('td', { class: 'num' }, '10'), sum.map(g => g.s10 == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: g.s10 >= 5 ? '' : 'lowsc' }, fmtNum(g.s10, 1))))),
+            h('tr', null, h('td', { class: 'muted' }, 'Số phiếu nhận được'), h('td'), sum.map(g => h('td', { class: 'num muted' }, g.n || '0'))),
+            h('tr', null, h('td', { class: 'muted' }, 'Được chấm bởi'), h('td'), sum.map(g => h('td', { class: 'num small muted' }, g.raters.join(', ') || '–')))))));
+      } else {
+        // nhiều nhóm/cặp: mỗi nhóm một dòng, tiêu chí viết tắt TC1, TC2… kèm chú giải
+        body.append(h('div', { class: 'scroll' }, h('table', { class: 't dgt' }, h('thead', null, h('tr', null, h('th', null, 'Nhóm được chấm'), d.crit.map((c, i) => h('th', { class: 'num', title: c.t }, 'TC' + (i + 1) + ' (' + fmtNum(c.p) + 'đ)')), h('th', { class: 'num' }, 'Tổng (' + fmtNum(total) + 'đ)'), h('th', { class: 'num' }, 'Thang 10'), h('th', { class: 'num' }, 'Số phiếu'))),
+          h('tbody', null, sum.map(g => h('tr', null, h('td', null, h('b', null, g.name + (g.sum != null && g.sum === best ? ' ★' : ''))), g.per.map((x, ci) => cellOf(x, d.crit[ci].p)), cellOf(g.sum, total, true), g.s10 == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: g.s10 >= 5 ? '' : 'lowsc' }, fmtNum(g.s10, 1))), h('td', { class: 'num muted' }, g.n || '0')))))),
+          h('div', { class: 'dglegend' }, d.crit.map((c, i) => h('div', null, h('b', null, 'TC' + (i + 1) + ': '), c.t))));
+      }
+      body.append(h('div', { class: 'small muted' }, 'Một nhóm có nhiều bạn cùng chấm thì lấy trung bình các phiếu của nhóm đó trước, rồi mới lấy trung bình giữa các nhóm chấm.'));
+      if (sum.some(g => g.notes.length)) body.append(h('details', { class: 'adv', open: open || null }, h('summary', null, 'Nhận xét của các nhóm'), h('div', null, sum.filter(g => g.notes.length).map(g => h('div', null, h('b', null, g.name + ': '), g.notes.map(n => h('div', { class: 'small' }, '• ' + n)))))));
+    }
+    async function load(manual) {
+      try { subs = await dgPull(d); } catch (e) { if (manual || !sum.length) { stamp.textContent = 'Chưa tải được – kiểm tra mạng.'; if (!sum.length) { body.innerHTML = ''; body.append(h('div', { class: 'note bad' }, 'Chưa tải được kết quả – kiểm tra mạng rồi bấm "Tải lại".')); } } return; }
+      sum = dgSummary(d, subs); paint();
+      stamp.textContent = 'Tự cập nhật 15 giây một lần · lúc ' + new Date().toLocaleTimeString('vi-VN');
+    }
+    // Tự cập nhật trong lúc học sinh đang chấm: thầy cô chỉ việc chiếu lên tivi
+    clearInterval(S.dgTimer);
+    S.dgTimer = setInterval(() => {
+      if (!card.isConnected || S.view !== 'peer') return clearInterval(S.dgTimer);
+      if (Date.now() - started > 90 * 60000) { clearInterval(S.dgTimer); stamp.textContent = 'Đã dừng tự cập nhật – bấm "Tải lại" khi cần.'; return; }
+      if (!document.hidden) load(false);
+    }, 15000);
+    await load(true);
   }
   drawList();
   v.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px' } }, h('h3', null, 'Phiếu đã tạo'), listBox), resBox);
