@@ -216,9 +216,29 @@ html body.kidbg{background:var(--paper)}
 .okbox{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .okbox input{width:20px;height:20px}
 @media (max-width:600px){.qopt{grid-template-columns:auto minmax(0,1fr) auto}.qopt>b{display:none}}
-.startcard{display:grid;gap:14px;border:2px solid var(--accent)}
-.startcard .big3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
-.startcard .big3 .btn{min-height:56px;font-size:16px}
+.startcard{display:grid;gap:14px;text-align:center;padding:26px 22px 20px;background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 11%,var(--card)),var(--card) 62%)}
+.startcard .big3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-width:860px;width:100%;margin:4px auto 0}
+.tile3{display:grid;justify-items:center;align-content:start;gap:6px;padding:18px 12px;border-radius:16px;border:1px solid var(--line);background:var(--card);cursor:pointer;box-shadow:0 2px 8px rgba(20,30,60,.06);transition:transform .12s,border-color .12s}
+.tile3:hover{transform:translateY(-2px);border-color:var(--accent)}
+.tile3 b{font-family:var(--f-display);font-size:18px;line-height:1.2}
+.tile3 small{color:var(--muted);font-size:13px;line-height:1.35}
+.tico{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 13%,var(--card));color:var(--accent)}
+.tile3.main{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tile3.main .tico{background:rgba(255,255,255,.2);color:inherit}
+.tile3.main small{color:inherit;opacity:.9}
+.startcard .recent{display:grid;gap:8px;text-align:left;border-top:1px solid var(--line);padding-top:14px;margin-top:4px}
+/* Bước Chọn bài: môn – khối – tên bài trên một hàng; hai chỗ tải lên nằm cạnh nhau */
+.g3{display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(0,2fr);gap:12px;align-items:start}
+.up2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.up2>*{border:1px dashed color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;padding:12px;background:color-mix(in srgb,var(--accent) 3%,var(--card));min-width:0}
+.up2 .f{display:grid;gap:8px}
+.up2 .f>span:first-child{font-weight:600}
+@media (max-width:820px){.g3,.up2{grid-template-columns:1fr}.startcard .big3{grid-template-columns:1fr;gap:10px}.tile3{grid-template-columns:auto 1fr;justify-items:start;text-align:left;column-gap:12px;padding:12px 14px}.tile3 .tico{grid-row:span 2;width:44px;height:44px}}
+.card{box-shadow:0 1px 2px rgba(20,30,60,.04)}
+nav.tabs button[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+#joinBtn{flex:none}
+@media (min-width:721px){nav.tabs{gap:2px}nav.tabs button{padding:7px 9px}.top .wrap{gap:10px}}
+body.kidbg #joinBtn{display:none}
 nav.tabs .morebtn{display:none}
 @media (max-width:720px){
   body:not(.kidbg) nav.tabs button.more{display:none}
@@ -352,6 +372,7 @@ nav.tabs button{white-space:nowrap}
 <header class="top"><div class="wrap">
   <button class="brand" id="brand" type="button"><span class="logo" id="logoBox" title="Logo trường (tải lên trong Hướng dẫn)">LOGO</span><span><b>TRƯỜNG THCS ĐỒNG HỢP</b><small>Smart Learning Games · Tam Hợp, Nghệ An</small></span></button>
   <nav class="tabs" id="nav"></nav>
+  <button class="btn small" id="joinBtn" type="button">Học sinh nhập mã</button>
   <span class="pill" id="cloudPill">Đang kiểm tra lưu trữ…</span>
 </div></header>
 <main class="wrap" id="main"></main>
@@ -2333,7 +2354,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.17-0848';
+const BUILD = '2026.11.18-2159';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2658,23 +2679,30 @@ function vHome() {
   refreshMatLessons().then(ch => { if (ch && v.isConnected) fillLessons(); });
   // Đầu trang: ba việc người mới cần thấy ngay, và bài gần đây để làm tiếp
   const recent = S.lib.find(p => !p.demo) || S.lib[0], demo = getPack('demo-khtn6') || S.lib[0];
-  const start = h('div', { class: 'card startcard' }, h('h1', null, 'Hôm nay thầy cô muốn làm gì?'),
+  // Ba việc chính bày thành ba ô lớn có hình, mỗi ô một dòng giải thích
+  const ico = d => { const e = h('span', { class: 'tico', 'aria-hidden': 'true' }); e.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; return e; };
+  const tile = (cls, d, title, sub, fn) => h('button', { type: 'button', class: 'tile3 ' + cls, onclick: fn }, ico(d), h('b', null, title), h('small', null, sub));
+  const nOwn = S.lib.filter(p => !p.demo).length;
+  const start = h('div', { class: 'card startcard' },
+    h('div', { class: 'small muted' }, S.profile.teacher ? 'Xin chào ' + S.profile.teacher : 'Xin chào thầy cô'),
+    h('h1', null, 'Hôm nay thầy cô muốn làm gì?'),
     h('div', { class: 'big3' },
-      h('button', { class: 'btn sun', onclick: () => go('play', { game: 'q2', pack: demo.id }) }, '▶ Chơi thử ngay (bài mẫu)'),
-      h('button', { class: 'btn primary', onclick: () => { v.querySelector('.quick').scrollIntoView({ behavior: 'smooth', block: 'start' }); const s = v.querySelector('#q-sub'); if (s) s.focus({ preventScroll: true }); } }, 'Tạo bài mới'),
-      h('button', { class: 'btn', onclick: () => go('library') }, 'Mở bài đã lưu')),
-    h('div', { style: { display: 'grid', gap: '8px' } }, h('span', { class: 'small muted', style: { letterSpacing: '.05em' } }, 'TIẾP TỤC BÀI GẦN ĐÂY'),
+      tile('main', '<path d="M12 5v14M5 12h14"/>', 'Tạo bài mới', 'Chọn bài, chọn trò, bấm chơi', () => { v.querySelector('.quick').scrollIntoView({ behavior: 'smooth', block: 'start' }); const s = v.querySelector('#q-sub'); if (s) s.focus({ preventScroll: true }); }),
+      tile('', '<path d="M4 6a2 2 0 0 1 2-2h4l2 3h6a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>', 'Mở bài đã lưu', nOwn ? nOwn + ' bài trong thư viện' : 'Thư viện bài của thầy cô', () => go('library')),
+      tile('', '<path d="M12 16V4M7 9l5-5 5 5M5 20h14"/>', 'Tải tài liệu lên', 'SGK, phân phối chương trình', () => { const u = v.querySelector('.up2'); u.scrollIntoView({ behavior: 'smooth', block: 'center' }); const b = u.querySelector('button'); if (b) b.focus({ preventScroll: true }); })),
+    h('div', { class: 'row', style: { justifyContent: 'center' } }, h('span', { class: 'small muted' }, 'Lần đầu dùng?'), h('button', { class: 'btn sun', onclick: () => go('play', { game: 'q2', pack: demo.id }) }, '▶ Chơi thử ngay (bài mẫu)')),
+    h('div', { class: 'recent' }, h('span', { class: 'small muted', style: { letterSpacing: '.05em' } }, 'TIẾP TỤC BÀI GẦN ĐÂY'),
       h('div', { class: 'row' }, h('b', { class: 'grow' }, (recent.title || recent.lesson || 'Bài chưa đặt tên') + ' · ' + parsePack(recent).q.length + ' câu' + (recent.status === 'Chờ duyệt' ? ' · chờ duyệt' : '')),
         h('button', { class: 'btn', onclick: () => { S.current = recent.id; go('hub'); } }, 'Chơi trên màn hình'), h('button', { class: 'btn', onclick: () => go('editor', recent.id) }, 'Chỉnh sửa'), h('button', { class: 'btn', onclick: () => openShare(recent) }, 'Giao bài'))));
   v.append(start,
-    h('div', { class: 'row' }, h('div', { class: 'grow' }, h('h2', null, 'Tạo bài mới'), h('p', { class: 'muted' }, S.profile.teacher ? 'GV: ' + S.profile.teacher + ' · chọn bài, chọn trò, bấm chơi.' : 'Chọn bài, chọn trò, bấm chơi.')),
-      h('button', { class: 'btn', onclick: () => { S.shared = null; go('join'); } }, 'Học sinh nhập mã')),
+    h('div', null, h('h2', null, 'Tạo bài mới'), h('p', { class: 'muted' }, 'Ba bước: chọn bài, chọn trò, bấm chơi.')),
     h('div', { class: 'card quick' },
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '1'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn bài'),
-        h('div', { class: 'fgrid' }, f('Môn học', subBox), f('Khối', gradeSel)),
-        f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn), periodBox, hintBox,
-        h('div', { class: 'f' }, h('span', null, 'Tài liệu tham khảo (SGK, kế hoạch bài dạy) – tải một lần cho môn và khối này'),
-          h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return fieldErr(!Q.subject ? v.querySelector('#q-sub') : gradeSel, 'Thầy cô chọn ' + (!Q.subject ? 'môn học' : 'khối') + ' ở ô này trước, rồi mới tải tài liệu.'); matIn.click(); } }, 'Tải tệp lên'), matIn, h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('kho') }, 'Xem / xóa tài liệu trong kho')), matMsg),
+        h('div', { class: 'g3' }, f('Môn học', subBox), f('Khối', gradeSel), f('Tên bài (bấm để sổ danh sách)', lessonSel, customIn)),
+        periodBox,
+        h('div', { class: 'up2' }, hintBox,
+          h('div', { class: 'f' }, h('span', null, 'Tài liệu tham khảo (SGK, kế hoạch bài dạy) – tải một lần cho môn và khối này'),
+            h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return fieldErr(!Q.subject ? v.querySelector('#q-sub') : gradeSel, 'Thầy cô chọn ' + (!Q.subject ? 'môn học' : 'khối') + ' ở ô này trước, rồi mới tải tài liệu.'); matIn.click(); } }, 'Tải tệp lên'), matIn, h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('kho') }, 'Xem / xóa tài liệu trong kho')), matMsg)),
         pagesBox)),
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
         h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => { Q.nq = clamp(+e.target.value || 10, 3, 50); saveQ(); } }))))),
@@ -2807,6 +2835,8 @@ async function checkUpdate(manual) {
   if (document.getElementById('updbox')) return;
   if (!document.getElementById('updbar')) document.body.prepend(h('div', { id: 'updbar' }, 'Đã có bản mới của app. ', h('button', { class: 'btn', onclick: apply }, 'Cập nhật ngay'), h('span', { class: 'small' }, ' (đang chơi hoặc đang soạn thì bấm sau cũng được)')));
 }
+// Nút "Học sinh nhập mã" luôn có ở thanh đầu trang
+{ const jb = document.getElementById('joinBtn'); if (jb) jb.onclick = () => { S.shared = null; go('join'); }; }
 // Sau khi cập nhật xong: báo một lần là đã lên bản mới
 if (IS_WEB) setTimeout(() => { const n = LS.get('dh.updnote', null); if (!n) return; LS.set('dh.updnote', null); if (n.v === BUILD) toast('Đã cập nhật xong lên bản ' + BUILD + '.', 6000); }, 1200);
 if (IS_WEB) { setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 10 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); }); }
