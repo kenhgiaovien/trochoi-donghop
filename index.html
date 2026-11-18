@@ -281,6 +281,10 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 /* Đánh giá chéo */
 .dgrow{display:grid;grid-template-columns:22px minmax(0,1fr) 138px auto;gap:8px;align-items:center}
 .dgsel{max-width:340px;font-size:16px;min-height:46px}
+.dgas{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px;max-height:420px;overflow:auto;padding:2px}
+.dga{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:5px 8px 5px 10px;font-size:14px}
+.dga.on{background:color-mix(in srgb,var(--accent) 7%,var(--card));border-color:color-mix(in srgb,var(--accent) 45%,var(--card))}
+.dga select{padding:6px 8px;min-height:36px}
 .dgql{font-weight:700;font-size:17px;display:block;margin-bottom:10px}
 .dgmem{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin-top:10px}
 .dgm{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;min-height:44px}
@@ -2463,7 +2467,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2257';
+const BUILD = '2026.11.18-2309';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2924,7 +2928,9 @@ async function checkUpdate(manual) {
   if (!ver || ver === BUILD) { if (manual) toast('Thầy cô đang dùng bản mới nhất (' + BUILD + ').'); return; }
   let tried = ''; try { tried = sessionStorage.getItem('dh.upd') || ''; } catch (e) { }
   const apply = () => { try { sessionStorage.setItem('dh.upd', ver); } catch (e) { } LS.set('dh.updnote', { v: ver, notes }); location.replace(location.pathname + '?v=' + encodeURIComponent(ver) + location.hash); };
-  const busy = S.view === 'play' || S.view === 'editor' || !!document.getElementById('ai-paste') || !!document.getElementById('own-paste') || !!document.fullscreenElement;
+  // Học sinh đang chấm dở phiếu đánh giá chéo: không tự tải lại trang, kẻo mất các ô đã chọn
+  const dgBusy = !!(S.shared && S.shared.kind === 'dg' && S.dgSt && S.dgSt.me != null && !S.dgSt.sent);
+  const busy = dgBusy || S.view === 'play' || S.view === 'editor' || !!document.getElementById('ai-paste') || !!document.getElementById('own-paste') || !!document.fullscreenElement;
   if (manual) return apply();
   // Học sinh đang làm bài qua link: cập nhật lặng lẽ như trước, không hiện bảng
   const student = !!S.shared || S.view === 'join';
@@ -4231,17 +4237,15 @@ function dgSplit(crit) {
   auto.forEach(c => { c.p = (base + (extra-- > 0 ? 1 : 0)) / 4; });
   return crit;
 }
-/* Thành viên từng nhóm do học sinh tự đánh dấu: lấy theo phiếu mới nhất của nhóm đó */
-function dgMembers(d, subs) {
-  if (!d.ros) return null;
-  const by = d.groups.map((_, g) => { const l = subs.filter(s => s.me === g && s.mem && s.mem.length); return l.length ? l[l.length - 1].mem.slice().sort((a, b) => a - b) : []; });
-  const count = {}; by.forEach(m => m.forEach(i => count[i] = (count[i] || 0) + 1));
-  return { by, dup: Object.keys(count).filter(i => count[i] > 1).map(Number), none: d.ros.map((_, i) => i).filter(i => !count[i]) };
+/* Thành viên từng nhóm: do giáo viên phân khi lập phiếu (d.grp[i] = số thứ tự nhóm của học sinh thứ i, -1 là chưa phân) */
+function dgMembers(d) {
+  if (!d.ros || !Array.isArray(d.grp)) return null;
+  return { by: d.groups.map((_, g) => d.ros.map((_, i) => i).filter(i => d.grp[i] === g)), dup: [], none: d.ros.map((_, i) => i).filter(i => !(d.grp[i] >= 0 && d.grp[i] < d.groups.length)) };
 }
 const dgNames =(type, n) => Array.from({ length: n }, (_, i) => (type === 'pair' ? 'Cặp ' : 'Nhóm ') + (i + 1));
 
 async function dgShare(d) {
-  const obj = { kind: 'dg', title: d.title, cls: d.cls, groups: d.groups, crit: d.crit, levels: d.levels, mode: d.mode, self: !!d.self, ros: d.ros || null, at: Date.now() };
+  const obj = { kind: 'dg', title: d.title, cls: d.cls, groups: d.groups, crit: d.crit, levels: d.levels, mode: d.mode, self: !!d.self, at: Date.now() };   // không đưa tên học sinh vào phiếu: việc phân nhóm nằm ở máy giáo viên
   obj.pub = (await teacherKeys()).pub;
   const id = rndId(10), key = crypto.getRandomValues(new Uint8Array(16));
   await fsCall('POST', 'bai', 'documentId=' + id, fsDoc(await aesEnc(key, await encodeObj(obj))));
@@ -4305,7 +4309,7 @@ function vPeer() {
   };
   const lvBox = h('div', { style: { display: 'grid', gap: '6px' } });
   const drawLv = () => { lvBox.innerHTML = ''; D.levels.forEach((l, i) => lvBox.append(h('div', { class: 'dgrow' }, h('b', { class: 'muted' }, (i + 1) + '.'), h('input', { type: 'text', value: l[0], 'aria-label': 'Tên mức ' + (i + 1), oninput: e => { l[0] = e.target.value; keep(); } }), h('input', { type: 'number', min: 0, max: 100, value: l[1], 'aria-label': 'Phần trăm điểm mức ' + (i + 1), oninput: e => { l[1] = clamp(+e.target.value || 0, 0, 100); keep(); } }), h('span', { class: 'small muted' }, '% điểm')))); };
-  const typeSeg = h('div', { class: 'seg' }, [['pair', 'Cặp đôi'], ['group', 'Nhóm']].map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': D.type === k, onclick: () => { D.type = k; keep(); typeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); nLabel.textContent = k === 'pair' ? 'Số cặp' : 'Số nhóm'; } }, t)));
+  const typeSeg = h('div', { class: 'seg' }, [['pair', 'Cặp đôi'], ['group', 'Nhóm']].map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': D.type === k, onclick: () => { D.type = k; keep(); typeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); nLabel.textContent = k === 'pair' ? 'Số cặp' : 'Số nhóm'; drawGrp(); } }, t)));
   const nLabel = h('span', null, D.type === 'pair' ? 'Số cặp' : 'Số nhóm');
   const read = () => {
     if (D.crit.some(c => !String(c.t || '').trim()) && D.crit.some(c => String(c.t || '').trim())) { D.crit = D.crit.filter(c => String(c.t || '').trim()); dgSplit(D.crit); keep(); drawCrit(); }
@@ -4316,8 +4320,9 @@ function vPeer() {
     if (dgTotal(crit) > 10.001) return 'Tổng điểm các tiêu chí đang vượt 10.';
     if (crit.some(c => !c.p)) return 'Có tiêu chí đang 0 điểm. Thầy cô giảm điểm ở tiêu chí khác hoặc chọn "Tự chia".';
     const ros = rosCls.includes(D.cls) ? S.roster.classes[D.cls].map(s => s.name) : null;
+    const nG = clamp(+D.n || 4, 2, 24), grp = ros ? ros.map((_, i) => { const g = ((D.grp || {})[D.cls] || [])[i]; return Number.isInteger(g) && g >= 0 && g < nG ? g : -1; }) : null;
     if (levels.length < 2) return 'Cần ít nhất hai mức đánh giá.';
-    return { title: String(D.title).trim(), cls: String(D.cls || '').trim(), type: D.type, groups: dgNames(D.type, clamp(+D.n || 4, 2, 24)), mode: D.mode, self: !!D.self, crit, levels, ros };
+    return { title: String(D.title).trim(), cls: String(D.cls || '').trim(), type: D.type, groups: dgNames(D.type, clamp(+D.n || 4, 2, 24)), mode: D.mode, self: !!D.self, crit, levels, ros, grp };
   };
   const showLink = d => {
     outBox.innerHTML = '';
@@ -4337,17 +4342,35 @@ function vPeer() {
     makeBtn.disabled = false; makeBtn.textContent = 'TẠO PHIẾU VÀ LẤY LINK';
   } }, 'TẠO PHIẾU VÀ LẤY LINK');
   const clsNote = h('div', { class: 'small muted' });
-  const clsHint = () => { clsNote.innerHTML = ''; if (rosCls.includes(D.cls)) clsNote.append('Đã gắn danh sách lớp ' + D.cls + ' (' + S.roster.classes[D.cls].length + ' học sinh): khi chấm, mỗi nhóm tự đánh dấu các bạn trong nhóm mình; bảng kết quả và tệp Excel sẽ có tên từng bạn kèm điểm của nhóm.'); else if (!rosCls.length) clsNote.append('Muốn học sinh tự chọn các bạn trong nhóm? ', h('button', { class: 'btn small', type: 'button', onclick: () => go('roster') }, 'Tải danh sách lớp lên trước')); };
+  const clsHint = () => { clsNote.innerHTML = ''; if (!rosCls.length) clsNote.append('Muốn phân nhóm theo tên học sinh? ', h('button', { class: 'btn small', type: 'button', onclick: () => go('roster') }, 'Tải danh sách lớp lên trước')); drawGrp(); };
+  // Phân nhóm: giáo viên xếp từng học sinh vào nhóm. Tên học sinh chỉ nằm ở máy giáo viên, không đưa vào link.
+  const grpBox = h('div');
+  function drawGrp() {
+    grpBox.innerHTML = ''; if (!rosCls.includes(D.cls)) return;
+    const names = S.roster.classes[D.cls].map(s => s.name), n = clamp(+D.n || 4, 2, 24), gn = dgNames(D.type, n);
+    D.grp = D.grp || {}; const A = D.grp[D.cls] = names.map((_, i) => { const g = (D.grp[D.cls] || [])[i]; return Number.isInteger(g) && g >= 0 && g < n ? g : -1; });
+    const sumEl = h('div', { class: 'small' }), upSum = () => { const left = A.filter(g => g < 0).length; sumEl.textContent = gn.map((x, g) => x + ': ' + A.filter(y => y === g).length + ' bạn').join(' · ') + (left ? ' · Chưa phân: ' + left + ' bạn' : ''); };
+    const setAll = f => { names.forEach((_, i) => A[i] = f(i)); keep(); drawGrp(); };
+    const grid = h('div', { class: 'dgas' }, names.map((name, i) => h('label', { class: 'dga' }, h('span', null, (i + 1) + '. ' + name), h('select', { 'aria-label': 'Nhóm của ' + name, onchange: e => { A[i] = +e.target.value; keep(); upSum(); e.target.closest('.dga').classList.toggle('on', A[i] >= 0); } }, h('option', { value: -1, selected: A[i] < 0 }, '—'), gn.map((x, g) => h('option', { value: g, selected: A[i] === g }, x))))));
+    grid.querySelectorAll('.dga').forEach((l, i) => l.classList.toggle('on', A[i] >= 0));
+    upSum();
+    grpBox.append(h('div', { style: { display: 'grid', gap: '8px' } }, h('b', null, 'Phân nhóm lớp ' + D.cls + ' (' + names.length + ' học sinh)'),
+      h('div', { class: 'small muted' }, 'Chọn nhóm cho từng học sinh, hoặc bấm một nút chia nhanh rồi chỉnh lại. Tên học sinh chỉ dùng ở máy thầy cô: bảng kết quả và tệp Excel sẽ có tên từng bạn kèm điểm của nhóm; phiếu học sinh chỉ hiện tên nhóm.'),
+      h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => setAll(i => Math.floor(i * n / names.length)) }, 'Chia đều theo thứ tự danh sách'),
+        h('button', { class: 'btn', type: 'button', onclick: () => { const ord = shuffle(names.map((_, i) => i)); setAll(i => ord.indexOf(i) % n); } }, 'Chia ngẫu nhiên'),
+        h('button', { class: 'btn ghost', type: 'button', onclick: () => setAll(() => -1) }, 'Bỏ phân nhóm')),
+      sumEl, grid));
+  }
   clsHint(); drawCrit(); drawLv();
   v.append(h('div', { class: 'card', style: { display: 'grid', gap: '14px' } }, h('h3', null, 'Lập phiếu đánh giá'),
     h('div', { class: 'scf' }, f('Tên phiếu', h('input', { type: 'text', id: 'dg-title', placeholder: 'VD: Phiếu chấm điểm chéo bài thực hành Tin 7', value: D.title, oninput: e => { D.title = e.target.value; keep(); } })),
       rosCls.length ? f('Lớp (lấy danh sách ở mục Lớp học)', h('select', { id: 'dg-cls', onchange: e => { D.cls = e.target.value; keep(); clsHint(); } }, h('option', { value: '' }, '— Không gắn danh sách lớp —'), rosCls.map(c => h('option', { value: c, selected: D.cls === c }, c + ' · ' + S.roster.classes[c].length + ' HS'))))
         : f('Lớp (không bắt buộc)', h('input', { type: 'text', id: 'dg-cls', placeholder: 'VD: 7A', value: D.cls, oninput: e => { D.cls = e.target.value; keep(); } })),
       h('div', { class: 'f' }, h('span', null, 'Hình thức'), typeSeg)),
-    h('div', { class: 'scf' }, h('label', { class: 'f' }, nLabel, h('input', { type: 'number', id: 'dg-n', min: 2, max: 24, value: D.n, oninput: e => { D.n = clamp(+e.target.value || 2, 2, 24); keep(); } })),
+    h('div', { class: 'scf' }, h('label', { class: 'f' }, nLabel, h('input', { type: 'number', id: 'dg-n', min: 2, max: 24, value: D.n, oninput: e => { D.n = clamp(+e.target.value || 2, 2, 24); keep(); drawGrp(); } })),
       f('Cách chấm', h('select', { id: 'dg-mode', onchange: e => { D.mode = e.target.value; keep(); } }, [['free', 'Mỗi nhóm tự chọn nhóm bạn để chấm'], ['ring', 'Chấm vòng tròn: nhóm 1 chấm nhóm 2, …, nhóm cuối chấm nhóm 1']].map(([k, t]) => h('option', { value: k, selected: D.mode === k }, t)))),
       h('label', { class: 'row small', style: { alignSelf: 'end', minHeight: '40px' } }, h('input', { type: 'checkbox', id: 'dg-self', checked: D.self, onchange: e => { D.self = e.target.checked; keep(); } }), 'Cho phép tự đánh giá nhóm mình')),
-    clsNote,
+    clsNote, grpBox,
     h('div', { style: { display: 'grid', gap: '8px' } }, h('div', { class: 'row' }, h('b', { class: 'grow' }, 'Tiêu chí và điểm tối đa'), h('span', { class: 'small muted' }, 'Tổng điểm: '), totalEl),
       h('div', { class: 'small muted' }, 'Mỗi dòng một tiêu chí. Tổng điểm là 10: thêm hay bớt tiêu chí thì app tự chia đều điểm. Muốn tiêu chí nào nặng hơn, thầy cô bấm ô bên phải để chọn điểm; phần còn lại app chia cho các tiêu chí khác. Có thể dán cả danh sách tiêu chí từ Word/Excel vào ô đầu tiên.'),
       critBox, overEl, h('div', null, h('button', { class: 'btn', type: 'button', onclick: () => { D.crit.push({ t: '' }); dgSplit(D.crit); keep(); drawCrit(); const ins = critBox.querySelectorAll('input[type=text]'); ins[ins.length - 1].focus(); } }, '+ Thêm tiêu chí'))),
@@ -4362,7 +4385,7 @@ function vPeer() {
     l.forEach(d => listBox.append(h('div', { class: 'row dgitem' }, h('div', { class: 'grow' }, h('b', null, d.title), h('div', { class: 'small muted' }, (d.cls ? 'Lớp ' + d.cls + ' · ' : '') + d.groups.length + (d.type === 'pair' ? ' cặp' : ' nhóm') + ' · ' + d.crit.length + ' tiêu chí · ' + fmtNum(dgTotal(d.crit)) + ' điểm · tạo ' + fmtDate(d.at))),
       h('button', { class: 'btn primary', onclick: () => { S.dgOpen = d.aid; drawRes(); } }, 'Xem kết quả'),
       h('button', { class: 'btn', onclick: () => copyText(d.link) }, 'Sao chép link'),
-      h('button', { class: 'btn', onclick: () => { Object.assign(D, { title: d.title, cls: d.cls, type: d.type, n: d.groups.length, mode: d.mode, self: d.self, crit: d.crit.map(c => ({ t: c.t, p: c.p, m: true })), levels: d.levels.map(x => x.slice()) }); keep(); render(); toast('Đã đưa phiếu lên khung soạn. Sửa rồi bấm tạo phiếu mới.', 4000); } }, 'Dùng làm mẫu'),
+      h('button', { class: 'btn', onclick: () => { Object.assign(D, { title: d.title, cls: d.cls, type: d.type, n: d.groups.length, mode: d.mode, self: d.self, crit: d.crit.map(c => ({ t: c.t, p: c.p, m: true })), levels: d.levels.map(x => x.slice()) }); if (d.cls && Array.isArray(d.grp)) { D.grp = D.grp || {}; D.grp[d.cls] = d.grp.slice(); } keep(); render(); toast('Đã đưa phiếu lên khung soạn. Sửa rồi bấm tạo phiếu mới.', 4000); } }, 'Dùng làm mẫu'),
       h('button', { class: 'btn danger', onclick: e => { if (e.target.dataset.c) { LS.set('dh.dg', dgList().filter(x => x.aid !== d.aid)); if (S.dgOpen === d.aid) { S.dgOpen = null; resBox.innerHTML = ''; } drawList(); } else { e.target.dataset.c = 1; e.target.textContent = 'Bấm lần nữa để xóa'; } } }, 'Xóa'))));
   }
   async function drawRes() {
@@ -4402,14 +4425,14 @@ function vPeer() {
             h('tr', { class: 'tot' }, h('td', null, h('b', null, 'Quy về thang 10')), h('td', { class: 'num' }, '10'), sum.map(g => g.s10 == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: g.s10 >= 5 ? '' : 'lowsc' }, fmtNum(g.s10, 1))))),
             h('tr', null, h('td', { class: 'muted' }, 'Số phiếu nhận được'), h('td'), sum.map(g => h('td', { class: 'num muted' }, g.n || '0'))),
             h('tr', null, h('td', { class: 'muted' }, 'Được chấm bởi'), h('td'), sum.map(g => h('td', { class: 'num small muted' }, g.raters.join(', ') || '–'))),
-            mem ? h('tr', null, h('td', { class: 'muted' }, 'Thành viên'), h('td'), mem.by.map(m => h('td', { class: 'small dgmb' }, m.length ? m.map(i => h('div', { class: mem.dup.includes(i) ? 'lowsc' : '' }, d.ros[i])) : h('span', { class: 'muted' }, 'chưa chọn')))) : null))));
+            mem ? h('tr', null, h('td', { class: 'muted' }, 'Thành viên'), h('td'), mem.by.map(m => h('td', { class: 'small dgmb' }, m.length ? m.map(i => h('div', { class: mem.dup.includes(i) ? 'lowsc' : '' }, d.ros[i])) : h('span', { class: 'muted' }, 'chưa phân')))) : null))));
       } else {
         // nhiều nhóm/cặp: mỗi nhóm một dòng, tiêu chí viết tắt TC1, TC2… kèm chú giải
         body.append(h('div', { class: 'scroll' }, h('table', { class: 't dgt' }, h('thead', null, h('tr', null, h('th', null, 'Nhóm được chấm'), d.crit.map((c, i) => h('th', { class: 'num', title: c.t }, 'TC' + (i + 1) + ' (' + fmtNum(c.p) + 'đ)')), h('th', { class: 'num' }, 'Tổng (' + fmtNum(total) + 'đ)'), h('th', { class: 'num' }, 'Thang 10'), h('th', { class: 'num' }, 'Số phiếu'))),
           h('tbody', null, sum.map(g => h('tr', null, h('td', null, h('b', null, g.name + (g.sum != null && g.sum === best ? ' ★' : ''))), g.per.map((x, ci) => cellOf(x, d.crit[ci].p)), cellOf(g.sum, total, true), g.s10 == null ? h('td', { class: 'num muted' }, '–') : h('td', { class: 'num' }, h('b', { class: g.s10 >= 5 ? '' : 'lowsc' }, fmtNum(g.s10, 1))), h('td', { class: 'num muted' }, g.n || '0')))))),
           h('div', { class: 'dglegend' }, d.crit.map((c, i) => h('div', null, h('b', null, 'TC' + (i + 1) + ': '), c.t))));
       }
-      if (mem && d.groups.length > 8) body.append(h('details', { class: 'adv' }, h('summary', null, 'Thành viên các nhóm'), h('div', null, mem.by.map((m, g) => h('div', null, h('b', null, d.groups[g] + ': '), m.length ? m.map(i => d.ros[i]).join(', ') : 'chưa chọn')))));
+      if (mem && d.groups.length > 8) body.append(h('details', { class: 'adv' }, h('summary', null, 'Thành viên các nhóm'), h('div', null, mem.by.map((m, g) => h('div', null, h('b', null, d.groups[g] + ': '), m.length ? m.map(i => d.ros[i]).join(', ') : 'chưa phân')))));
       if (mem && mem.dup.length) body.append(h('div', { class: 'ferr' }, 'Có bạn được đánh dấu ở hai nhóm (chữ đỏ): ' + mem.dup.map(i => d.ros[i]).join(', ') + '. Thầy cô nhắc các nhóm chọn lại rồi gửi thêm một phiếu.'));
       if (mem && mem.none.length && mem.none.length < d.ros.length) body.append(h('details', { class: 'adv' }, h('summary', null, 'Học sinh chưa thuộc nhóm nào (' + mem.none.length + ')'), h('div', null, mem.none.map(i => d.ros[i]).join(', '))));
       body.append(h('div', { class: 'small muted' }, 'Một nhóm có nhiều bạn cùng chấm thì lấy trung bình các phiếu của nhóm đó trước, rồi mới lấy trung bình giữa các nhóm chấm.'));
@@ -4440,7 +4463,11 @@ function vPeer() {
 function vPeerJoin() {
   const d = S.shared, total = dgTotal(d.crit), G = d.groups.length;
   const doneKey = 'dh.dgdone.' + (d.aid || 'thu'), done = () => LS.get(doneKey, []);
+  // Các ô đã chọn được giữ lại cả khi trang bị tải lại giữa chừng (mất mạng, app cập nhật)
+  const stKey = 'dh.dgst.' + (d.aid || 'thu');
+  if (!(S.dgSt && S.dgSt.aid === (d.aid || 'thu')) && d.aid) { try { const o = JSON.parse(sessionStorage.getItem(stKey) || 'null'); if (o && o.aid === d.aid && Array.isArray(o.s)) S.dgSt = o; } catch (e) { } }
   const st = S.dgSt && S.dgSt.aid === (d.aid || 'thu') ? S.dgSt : (S.dgSt = { aid: d.aid || 'thu', me: null, to: null, s: d.crit.map(() => null), nx: '', sent: null, mem: [] });
+  const saveSt = () => { if (d.aid) try { sessionStorage.setItem(stKey, JSON.stringify(st)); } catch (e) { } };
   // Phiếu đổi số tiêu chí/số nhóm (xem thử nhiều lần) thì bỏ các lựa chọn cũ, tránh lệch dòng và không cộng được điểm
   if (st.s.length !== d.crit.length || st.s.some(x => x != null && !d.levels[x])) st.s = d.crit.map(() => null);
   if (st.me != null && st.me >= G) { st.me = null; st.to = null; }
@@ -4453,7 +4480,7 @@ function vPeerJoin() {
   const body = h('div', { style: { display: 'grid', gap: '18px' } }); v.append(body);
   const targets = () => d.mode === 'ring' ? [(st.me + 1) % G].concat(d.self ? [st.me] : []) : d.groups.map((_, i) => i).filter(i => d.self || i !== st.me);
   function draw() {
-    body.innerHTML = '';
+    body.innerHTML = ''; saveSt();
     if (st.sent) {
       const left = targets().filter(i => !done().includes(st.me + '>' + i));
       body.append(h('div', { class: 'card', style: { display: 'grid', gap: '12px', textAlign: 'center', justifyItems: 'center' } }, h('h2', null, st.sent === 'test' ? 'Bản xem thử – phiếu không được gửi đi' : '✓ Đã gửi phiếu chấm ' + d.groups[st.to]), h('div', { class: 'big', style: { fontSize: '64px' } }, fmtNum(st.total, 2) + '/' + fmtNum(total)),
@@ -4464,28 +4491,20 @@ function vPeerJoin() {
     const word = d.type === 'pair' ? 'cặp' : 'nhóm';
     const sel = (id, cur, list, on, mark) => h('select', { id, class: 'dgsel', onchange: e => on(e.target.value === '' ? null : +e.target.value) }, h('option', { value: '' }, 'Chọn'), list.map(i => h('option', { value: i, selected: cur === i }, d.groups[i] + (mark && mark(i) ? ' ✓ (đã chấm)' : ''))));
     const q = (label, el) => h('div', { class: 'card dgq' }, h('label', { class: 'dgql', for: el.id }, label, h('span', { class: 'lowsc' }, ' *')), el);
-    body.append(q((d.type === 'pair' ? 'Cặp' : 'Nhóm') + ' của em là ' + word + ' mấy?', sel('dg-me', st.me, d.groups.map((_, i) => i), i => { st.me = i; st.to = i != null && d.mode === 'ring' && !d.self ? (i + 1) % G : null; st.mem = i == null ? [] : LS.get(memKey(i), []).filter(x => x < (d.ros || []).length); draw(); })));
+    body.append(q((d.type === 'pair' ? 'Cặp' : 'Nhóm') + ' của em là ' + word + ' mấy?', sel('dg-me', st.me, d.groups.map((_, i) => i), i => { st.me = i; st.to = i != null && d.mode === 'ring' && !d.self ? (i + 1) % G : null; draw(); })));
     if (st.me == null) return;
-    if (d.ros) {
-      const cnt = h('b'), grid = h('div', { class: 'dgmem' }), upc = () => { cnt.textContent = st.mem.length ? 'Đã chọn ' + st.mem.length + ' bạn' : 'Chưa chọn bạn nào'; };
-      d.ros.forEach((name, i) => grid.append(h('label', { class: 'dgm', 'data-n': dgPlain(name) }, h('input', { type: 'checkbox', checked: st.mem.includes(i), onchange: e => { st.mem = e.target.checked ? st.mem.concat(i) : st.mem.filter(x => x !== i); LS.set(memKey(st.me), st.mem); upc(); } }), h('span', null, (i + 1) + '. ' + name))));
-      upc();
-      body.append(h('div', { class: 'card dgq', id: 'dg-memcard' }, h('div', { class: 'dgql' }, 'Đánh dấu tên các bạn trong ' + d.groups[st.me] + ' (cả tên em)', h('span', { class: 'lowsc' }, ' *')),
-        h('div', { class: 'row' }, h('input', { type: 'search', placeholder: 'Tìm tên…', style: { maxWidth: '260px' }, 'aria-label': 'Tìm tên học sinh', oninput: e => { const k = dgPlain(e.target.value.trim()); grid.querySelectorAll('.dgm').forEach(l => { l.hidden = !!k && !l.dataset.n.includes(k) && !l.querySelector('input').checked; }); } }), cnt), grid));
-    }
     if (d.mode === 'ring' && !d.self) body.append(h('div', { class: 'card dgq' }, h('div', { class: 'dgql' }, 'Em đang chấm điểm cho: ' + d.groups[st.to])));
     else body.append(q('Em đang chấm điểm cho ' + word + ' nào?', sel('dg-to', st.to, targets(), i => { st.to = i; draw(); }, i => done().includes(st.me + '>' + i))));
     if (st.to == null) return;
-    const sumEl = h('b'), upd = () => { sumEl.textContent = fmtNum(st.s.reduce((a, x, ci) => a + (x == null ? 0 : d.crit[ci].p * d.levels[x][1] / 100), 0), 2) + '/' + fmtNum(total); };
+    const sumEl = h('b'), upd = () => { saveSt(); sumEl.textContent = fmtNum(st.s.reduce((a, x, ci) => a + (x == null ? 0 : d.crit[ci].p * d.levels[x][1] / 100), 0), 2) + '/' + fmtNum(total); };
     const err = h('div', { class: 'ferr', role: 'alert' });
     const send = h('button', { class: 'btn primary big', onclick: async () => {
-      if (d.ros && !st.mem.length) { err.textContent = 'Em chưa đánh dấu tên các bạn trong ' + word + ' mình.'; const mc = body.querySelector('#dg-memcard'); if (mc) mc.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
       const miss = st.s.findIndex(x => x == null);
       if (miss >= 0) { err.textContent = 'Em chưa chấm tiêu chí ' + (miss + 1) + '.'; const el = body.querySelectorAll('.dgcr')[miss]; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
       st.total = st.s.reduce((a, x, ci) => a + d.crit[ci].p * d.levels[x][1] / 100, 0);
       if (S.sharedTest || !d.aid) { st.sent = 'test'; return draw(); }
       send.disabled = true; send.textContent = 'Đang gửi…'; err.textContent = '';
-      try { if (!(await cloudSubmit('dg:' + JSON.stringify({ me: st.me, to: st.to, s: st.s, nx: st.nx.slice(0, 300), at: Date.now(), mem: d.ros ? st.mem : undefined })))) throw 0; LS.set(doneKey, done().concat(st.me + '>' + st.to)); st.sent = 'ok'; draw(); window.scrollTo(0, 0); }
+      try { if (!(await cloudSubmit('dg:' + JSON.stringify({ me: st.me, to: st.to, s: st.s, nx: st.nx.slice(0, 300), at: Date.now() })))) throw 0; LS.set(doneKey, done().concat(st.me + '>' + st.to)); st.sent = 'ok'; draw(); window.scrollTo(0, 0); }
       catch (e) { send.disabled = false; send.textContent = 'GỬI ĐÁNH GIÁ'; err.textContent = navigator.onLine === false ? 'Chưa gửi được: máy đang mất mạng. Em kiểm tra mạng rồi bấm lại.' : 'Chưa gửi được. Em bấm lại lần nữa.'; }
     } }, 'GỬI ĐÁNH GIÁ');
     body.append(h('div', { class: 'card', style: { display: 'grid', gap: '14px' } }, h('div', { class: 'dgql', style: { marginBottom: 0 } }, 'Đánh giá ' + d.groups[st.to] + ' theo các tiêu chí sau:', h('span', { class: 'lowsc' }, ' *')),
@@ -4493,7 +4512,7 @@ function vPeerJoin() {
         h('thead', null, h('tr', null, h('th'), d.levels.map(l => h('th', null, l[0], h('div', { class: 'muted' }, l[1] === 100 ? '(trọn điểm)' : l[1] === 0 ? '(0 điểm)' : '(đạt ' + fmtNum(l[1]) + '%)'))))),
         h('tbody', null, d.crit.map((c, ci) => h('tr', { class: 'dgcr' }, h('th', { scope: 'row' }, (ci + 1) + '. ' + c.t, h('span', { class: 'muted' }, ' (' + fmtNum(c.p) + ' điểm)')),
           d.levels.map((l, li) => h('td', null, h('label', null, h('input', { type: 'radio', name: 'dgc' + ci, checked: st.s[ci] === li, 'aria-label': 'Tiêu chí ' + (ci + 1) + ': ' + l[0], onchange: () => { st.s[ci] = li; upd(); err.textContent = ''; } }), h('span', { class: 'mlab' }, l[0] + ' – ' + fmtNum(c.p * l[1] / 100, 2) + ' điểm'))))))))),
-      h('label', { class: 'f' }, h('span', null, 'Nhận xét cho nhóm bạn (không bắt buộc)'), h('input', { type: 'text', maxlength: 300, value: st.nx, placeholder: 'VD: Trình bày đẹp, cần lưu tệp đúng tên', oninput: e => { st.nx = e.target.value; } })),
+      h('label', { class: 'f' }, h('span', null, 'Nhận xét cho nhóm bạn (không bắt buộc)'), h('input', { type: 'text', maxlength: 300, value: st.nx, placeholder: 'VD: Trình bày đẹp, cần lưu tệp đúng tên', oninput: e => { st.nx = e.target.value; saveSt(); } })),
       h('div', { class: 'row' }, h('span', null, 'Tổng điểm em chấm: '), sumEl), err, h('div', null, send)));
     upd();
   }
