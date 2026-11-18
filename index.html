@@ -20,13 +20,14 @@
 <style>
 /* Layout: a teacher's workbench (light, calm) around a chalkboard stage (dark, projector-sized) where games run. */
 :root{
-  --paper:#EEF2F7; --card:#FFFFFF; --ink:#1A2238; --muted:#5A6580; --line:#D3DAE6; --soft:#E3E9F2;
-  --accent:#2B59D9; --accent-ink:#FFFFFF; --sun:#F3B53A; --coral:#E35D4B; --leaf:#2E9B63; --sky:#3C8DD8; --plum:#8A55C9;
-  --ok:#23945A; --bad:#D2483A; --warn:#B7791F;
-  --board:#1D4A3D; --board2:#163A30; --chalk:#F4F7F2; --chalk-dim:#BFD3C8;
+  --paper:#F3F2FB; --card:#FFFFFF; --ink:#1B1B3A; --muted:#5E6082; --line:#DDDCF0; --soft:#ECEBFA;
+  --accent:#5B3FE4; --accent-ink:#FFFFFF; --sun:#FFB81C; --coral:#F0506E; --leaf:#12B886; --sky:#1C9BF0; --plum:#B24BE0;
+  --ok:#12996E; --bad:#D93A4E; --warn:#B7791F;
+  --board:#4527B8; --board2:#1E1257; --chalk:#FFFFFF; --chalk-dim:#D5CCFF;
+  --grad:linear-gradient(120deg,#4B2FD9 0%,#7A3FF2 52%,#D9469A 100%); --grad2:linear-gradient(120deg,#4B2FD9,#7A3FF2);
   --f-display:"Baloo 2","Be Vietnam Pro",system-ui,sans-serif;
   --f-body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --r:12px; --shadow:0 1px 2px rgba(20,30,60,.06),0 6px 20px rgba(20,30,60,.06);
+  --r:16px; --shadow:0 1px 2px rgba(40,30,110,.06),0 8px 24px rgba(40,30,110,.08);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#0E141D; --card:#161F2B; --ink:#E6ECF5; --muted:#9AA6BC; --line:#2A3647; --soft:#1D2836;
@@ -170,21 +171,14 @@ table.t td.num{font-variant-numeric:tabular-nums;text-align:right}
 .tile.badc::after{content:" ✗";font-weight:800}
 .ferr{color:var(--bad);font-weight:600;font-size:13.5px}
 .ferr:empty{display:none}
-/* Ít màu hơn: thẻ trò chơi một tông, phương án trả lời một tông (đúng/sai mới có màu) */
-.c-q,.c-pairs,.c-words,.c-seq,.c-groups,.c-tf,.c-cloze{background:var(--accent)}
-.c-tool{background:var(--muted)}
-.stage .opt:nth-child(n){background:var(--s-tile);border-color:var(--s-tile2);color:var(--s-fg)}
-.stage .opt .k{background:var(--sun);color:#2A1E00}
-.stage .opt:hover{background:var(--s-tile2);filter:none}
-.stage .opt[aria-pressed="true"]{border-color:var(--sun);box-shadow:none}
-.stage .opt.right{background:rgba(46,155,99,.55);border-color:#7CF2B0;outline:none}
-.stage .opt.wrong{background:rgba(210,72,58,.45);border-color:#FF9C8F;opacity:1}
-body .kgames button:nth-child(n){background:var(--accent)}
-body .kgames button:nth-child(even){background:#1D4A3D}
-body .bigpick button:nth-child(n){background:var(--accent)}
-body .kid .namegrid button:nth-child(n) .stt{background:var(--accent)}
-body .kidhero{background:linear-gradient(120deg,#1D4A3D,#2B59D9);box-shadow:none}
-html body.kidbg{background:var(--paper)}
+/* Màu sắc: thẻ trò chơi mỗi nhóm một màu, bốn phương án trả lời bốn màu (đúng/sai vẫn có dấu ✓ ✗ kèm theo) */
+.c-q{background:linear-gradient(140deg,#6C4DF5,#4B2FD9)} .c-pairs{background:linear-gradient(140deg,#22C99A,#0E9E78)} .c-words{background:linear-gradient(140deg,#C768F0,#9A37CF)} .c-seq{background:linear-gradient(140deg,#3CB4FF,#1583DB)}
+.c-groups{background:linear-gradient(140deg,#FFA63D,#EE7A12)} .c-tf{background:linear-gradient(140deg,#FF6F8A,#E33B60)} .c-cloze{background:linear-gradient(140deg,#2CC7D6,#0D97A8)} .c-tool{background:linear-gradient(140deg,#8A8FB0,#5E6082)}
+.stage .opt:nth-child(4n+1){background:#E0344F}.stage .opt:nth-child(4n+2){background:#1877E6}.stage .opt:nth-child(4n+3){background:#D98E04}.stage .opt:nth-child(4n+4){background:#18A06B}
+.stage .opt{box-shadow:0 5px 0 rgba(0,0,0,.22)}
+.stage .opt.right{outline:4px solid #7CF2B0;filter:none}
+.stage .opt.wrong{opacity:.5}
+body .kidhero{background:var(--grad)}
 /* Màn chọn chế độ chơi và bảng điểm đội */
 .pg{display:grid;gap:20px;max-width:980px;width:100%;margin:0 auto;align-content:start}
 .pghow{color:var(--s-dim);font-size:17px;max-width:760px;margin-top:6px}
@@ -239,6 +233,51 @@ nav.tabs button[aria-current="page"]{background:var(--accent);color:var(--accent
 #joinBtn{flex:none}
 @media (min-width:721px){nav.tabs{gap:2px}nav.tabs button{padding:7px 9px}.top .wrap{gap:10px}}
 body.kidbg #joinBtn{display:none}
+/* ===== Bộ màu mới: tím – hồng – vàng ===== */
+:root[data-theme="dark"]{--accent:#9D8CFF;--grad:linear-gradient(120deg,#3A23B0,#5F2FC4 52%,#A8347A);--grad2:linear-gradient(120deg,#6E5BF0,#9D6BFF)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--accent:#9D8CFF;--grad:linear-gradient(120deg,#3A23B0,#5F2FC4 52%,#A8347A);--grad2:linear-gradient(120deg,#6E5BF0,#9D6BFF)}}
+.top{background:var(--grad);border-bottom:0;box-shadow:0 4px 18px rgba(60,30,160,.22)}
+.top .brand b{color:#fff}
+.top .brand small{color:rgba(255,255,255,.85)}
+.top .pill{background:rgba(255,255,255,.18);color:#fff}
+#joinBtn{background:var(--sun);border-color:var(--sun);color:#2A1E00;font-weight:700}
+#joinBtn:hover{background:var(--sun);border-color:#fff;filter:brightness(1.06)}
+@media (min-width:721px){
+  nav.tabs button{color:rgba(255,255,255,.9)}
+  nav.tabs button:hover{background:rgba(255,255,255,.18);color:#fff}
+  nav.tabs button[aria-current="page"]{background:#fff;color:#4B2FD9}
+}
+.card{border-color:color-mix(in srgb,var(--line) 70%,transparent);box-shadow:var(--shadow)}
+.btn{border-radius:12px}
+.btn.primary{background:var(--grad2);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(91,63,228,.28)}
+.btn.sun{box-shadow:0 4px 12px rgba(255,184,28,.3)}
+.btn.leaf{box-shadow:0 4px 12px rgba(18,153,110,.25)}
+.qn{background:var(--grad2);color:#fff;box-shadow:0 4px 10px rgba(91,63,228,.3)}
+.chip[aria-pressed="true"]{background:var(--grad2);border-color:transparent;color:#fff}
+.view>h1{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;width:fit-content}
+.startcard{background:var(--grad);color:#fff;border:0;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(75,47,217,.28)}
+.startcard::before{content:"";position:absolute;width:340px;height:340px;border-radius:50%;background:rgba(255,255,255,.1);right:-110px;top:-150px;pointer-events:none}
+.startcard::after{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.08);left:-80px;bottom:-110px;pointer-events:none}
+.startcard>*{position:relative;z-index:1}
+.startcard .muted{color:rgba(255,255,255,.88)}
+.startcard h1{color:#fff}
+.tile3{border:0;color:var(--ink);box-shadow:0 8px 20px rgba(20,10,80,.2)}
+.tile3:hover{transform:translateY(-4px)}
+.tile3.main{background:var(--sun);color:#2A1E00}
+.tile3.main .tico{background:rgba(255,255,255,.55);color:#2A1E00}
+.tile3:nth-child(2) .tico{background:color-mix(in srgb,var(--leaf) 16%,var(--card));color:var(--leaf)}
+.tile3:nth-child(3) .tico{background:color-mix(in srgb,var(--coral) 14%,var(--card));color:var(--coral)}
+.startcard .btn.sun{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.65);color:#fff;box-shadow:none}
+.startcard .btn.sun:hover{background:rgba(255,255,255,.28)}
+.startcard .recent{border-top:0;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 14px}
+.startcard .recent .btn{background:#fff;border-color:#fff}
+.gcard{border-radius:14px;box-shadow:0 1px 2px rgba(40,30,110,.05);transition:transform .12s,box-shadow .12s,border-color .12s}
+.gcard:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:var(--shadow)}
+.gico{border-radius:12px;box-shadow:0 4px 10px rgba(40,30,110,.18)}
+.up2>*{background:color-mix(in srgb,var(--accent) 5%,var(--card))}
+table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(--accent)}
+.note{border-radius:0 12px 12px 0}
+.door.t{background:var(--grad);border:0}
 nav.tabs .morebtn{display:none}
 @media (max-width:720px){
   body:not(.kidbg) nav.tabs button.more{display:none}
@@ -2354,7 +2393,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2159';
+const BUILD = '2026.11.18-2203';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
