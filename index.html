@@ -2482,7 +2482,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.19-0848';
+const BUILD = '2026.11.19-1010';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4358,7 +4358,7 @@ function vPeer() {
   };
   const lvBox = h('div', { style: { display: 'grid', gap: '6px' } });
   const drawLv = () => { lvBox.innerHTML = ''; D.levels.forEach((l, i) => lvBox.append(h('div', { class: 'dgrow' }, h('b', { class: 'muted' }, (i + 1) + '.'), h('input', { type: 'text', value: l[0], 'aria-label': 'Tên mức ' + (i + 1), oninput: e => { l[0] = e.target.value; keep(); drawPrev(); } }), h('input', { type: 'number', min: 0, max: 100, value: l[1], 'aria-label': 'Phần trăm điểm mức ' + (i + 1), oninput: e => { l[1] = clamp(+e.target.value || 0, 0, 100); keep(); drawPrev(); } }), h('span', { class: 'small muted' }, '% điểm')))); };
-  const typeSeg = h('div', { class: 'seg' }, [['pair', 'Cặp đôi'], ['group', 'Nhóm']].map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': D.type === k, onclick: () => { D.type = k; keep(); typeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); nLabel.textContent = k === 'pair' ? 'Số cặp' : 'Số nhóm'; drawGrp(); } }, t)));
+  const typeSeg = h('div', { class: 'seg' }, [['pair', 'Nhóm cặp đôi'], ['group', 'Nhóm nhiều người']].map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': D.type === k, onclick: () => { D.type = k; keep(); typeSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); nLabel.textContent = k === 'pair' ? 'Số cặp' : 'Số nhóm'; drawGrp(); } }, t)));
   const nLabel = h('span', null, D.type === 'pair' ? 'Số cặp' : 'Số nhóm');
   const read = () => {
     if (D.crit.some(c => !String(c.t || '').trim()) && D.crit.some(c => String(c.t || '').trim())) { D.crit = D.crit.filter(c => String(c.t || '').trim()); dgSplit(D.crit); keep(); drawCrit(); }
@@ -4415,7 +4415,7 @@ function vPeer() {
     h('div', { class: 'scf' }, f('Tên phiếu', h('input', { type: 'text', id: 'dg-title', placeholder: 'VD: Phiếu chấm điểm chéo bài thực hành Tin 7', value: D.title, oninput: e => { D.title = e.target.value; keep(); } })),
       rosCls.length ? f('Lớp (lấy danh sách ở mục Lớp học)', h('select', { id: 'dg-cls', onchange: e => { D.cls = e.target.value; keep(); clsHint(); } }, h('option', { value: '' }, '— Không gắn danh sách lớp —'), rosCls.map(c => h('option', { value: c, selected: D.cls === c }, c + ' · ' + S.roster.classes[c].length + ' HS'))))
         : f('Lớp (không bắt buộc)', h('input', { type: 'text', id: 'dg-cls', placeholder: 'VD: 7A', value: D.cls, oninput: e => { D.cls = e.target.value; keep(); } })),
-      h('div', { class: 'f' }, h('span', null, 'Hình thức'), typeSeg)),
+      h('div', { class: 'f' }, h('span', null, 'Hình thức nhóm'), typeSeg)),
     h('div', { class: 'scf' }, h('label', { class: 'f' }, nLabel, h('input', { type: 'number', id: 'dg-n', min: 2, max: 24, value: D.n, oninput: e => { D.n = clamp(+e.target.value || 2, 2, 24); keep(); drawGrp(); } })),
       f('Cách chấm', h('select', { id: 'dg-mode', onchange: e => { D.mode = e.target.value; keep(); } }, [['free', 'Mỗi nhóm tự chọn nhóm bạn để chấm'], ['ring', 'Chấm vòng tròn: nhóm 1 chấm nhóm 2, …, nhóm cuối chấm nhóm 1']].map(([k, t]) => h('option', { value: k, selected: D.mode === k }, t)))),
       h('label', { class: 'row small', style: { alignSelf: 'end', minHeight: '40px' } }, h('input', { type: 'checkbox', id: 'dg-self', checked: D.self, onchange: e => { D.self = e.target.checked; keep(); } }), 'Cho phép tự đánh giá nhóm mình')),
