@@ -283,6 +283,9 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 .dgrow.dgcrit{grid-template-columns:96px minmax(0,1fr) 168px auto}
 .dgrow.dgcrit>b{color:var(--accent);white-space:nowrap}
 @media (max-width:600px){.dgrow.dgcrit{grid-template-columns:minmax(0,1fr) 128px auto}.dgrow.dgcrit>b{grid-column:1/-1;margin-top:4px}}
+.pickg{background:color-mix(in srgb,var(--accent) 12%,var(--card));color:var(--accent);font-size:13px;padding:4px 6px 4px 12px}
+.pickg button{border:0;background:none;color:inherit;cursor:pointer;font-weight:700;padding:2px 6px;border-radius:50%}
+.pickg button:hover{background:color-mix(in srgb,var(--accent) 22%,var(--card))}
 .dgdot{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);vertical-align:middle}
 .dgprev{border:1px dashed var(--line)}
 .dgsel{max-width:340px;font-size:16px;min-height:46px}
@@ -2472,7 +2475,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.18-2329';
+const BUILD = '2026.11.19-0846';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2759,19 +2762,30 @@ function vHome() {
   const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.classes = []; onSG(); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
   // --- trò chơi ---
   const featured = ['m2', 'q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
-  const gameSel = h('select', { id: 'q-game', onchange: e => setGame(e.target.value) }, Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id, selected: Q.game === g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
-  const featBox = h('div', { class: 'chips' }, featured.map(id => h('button', { type: 'button', class: 'chip', 'data-g': id, 'aria-pressed': Q.game === id, onclick: () => setGame(id) }, gameById(id).name)));
-  function setGame(id) { Q.game = id; saveQ(); gameSel.value = id; featBox.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.g === id)); }
+  // Chọn được NHIỀU trò cho một bài: bấm thẻ để chọn/bỏ, hoặc thêm từ ô sổ xuống
+  Q.games = (Array.isArray(Q.games) && Q.games.length ? Q.games : [Q.game || 'q2']).filter(id => gameById(id)); if (!Q.games.length) Q.games = ['q2'];
+  const gameSel = h('select', { id: 'q-game', onchange: e => { const id = e.target.value; e.target.value = ''; if (id && !Q.games.includes(id)) setGame(id); } }, h('option', { value: '' }, '— Bấm để thêm trò khác —'), Object.entries(KINDS).map(([k, name]) => h('optgroup', { label: name }, GAMES.filter(g => g.kind === k).map(g => h('option', { value: g.id }, g.name + (g.team ? ' (chơi đội)' : ''))))));
+  const featBox = h('div', { class: 'chips' }, featured.map(id => h('button', { type: 'button', class: 'chip', 'data-g': id, onclick: () => setGame(id) }, gameById(id).name)));
+  const pickBox = h('div', { class: 'row', id: 'q-picked' });
+  function drawPick() {
+    featBox.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', Q.games.includes(c.dataset.g)));
+    pickBox.innerHTML = ''; pickBox.append(h('b', { class: 'small' }, 'Đã chọn ' + Q.games.length + ' trò:'), ...Q.games.map(id => h('span', { class: 'pill plain pickg' }, gameById(id).name, Q.games.length > 1 ? h('button', { type: 'button', title: 'Bỏ trò ' + gameById(id).name, 'aria-label': 'Bỏ trò ' + gameById(id).name, onclick: () => setGame(id) }, '✕') : null)));
+  }
+  // bấm một trò: chưa chọn thì thêm, đang chọn thì bỏ (luôn giữ lại ít nhất một trò)
+  function setGame(id) { if (Q.games.includes(id)) { if (Q.games.length > 1) Q.games = Q.games.filter(x => x !== id); } else Q.games.push(id); Q.game = Q.games[0]; saveQ(); drawPick(); if (typeof syncBtn === 'function') syncBtn(); }
+  drawPick();
   // --- bắt đầu ---
   async function quickStart(action) {
-    const g = gameById(Q.game) || GAMES[0];
-    if (g.kind === 'tool') return go('play', { game: g.id, pack: S.lib[0].id });
+    const gs = Q.games.map(gameById).filter(Boolean), g = gs[0] || GAMES[0];
+    if (gs.length === 1 && g.kind === 'tool') return go('play', { game: g.id, pack: S.lib[0].id });
     const lesson = lessonName();
     if (!Q.subject) return fieldErr(v.querySelector('#q-sub'), 'Thầy cô chọn môn học ở ô này.');
     if (!Q.grade) return fieldErr(gradeSel, 'Thầy cô chọn khối ở ô này.');
     if (!lesson) return fieldErr(isCustom() ? customIn : lessonSel, isCustom() ? 'Thầy cô gõ tên bài vào ô này.' : 'Thầy cô bấm vào ô này để chọn bài (hoặc chọn "Gõ tên bài khác").');
     let p = S.lib.find(x => !x.demo && x.subject === Q.subject && String(x.grade) === String(Q.grade) && norm(x.lesson) === norm(lesson) && (x.period || 'Toàn bài') === Q.period);
-    const need = () => COUNT(parsePack(p), g.kind) < g.min;
+    // các trò đã chọn mà bài đủ dữ liệu để chơi; "need" = chưa trò nào chơi được
+    const ready = () => { const D = parsePack(p); return gs.filter(x => COUNT(D, x.kind) >= x.min); };
+    const need = () => !ready().filter(x => x.kind !== 'tool').length;
     let fresh = false; const c = cur();
     if (!p) { p = newPack(); fresh = true; Object.assign(p, { subject: Q.subject, grade: Q.grade, lesson, title: lesson + (Q.period !== 'Toàn bài' ? ' – ' + Q.period : ''), period: Q.period, periods: c ? c.n : 1, teacher: S.profile.teacher || '' }); }
     p.nq = +Q.nq || 10; if (Q.classes.length) p.classes = Q.classes.slice();
@@ -2789,7 +2803,14 @@ function vHome() {
       status.innerHTML = ''; status.append(h('div', { class: 'note' }, 'Đã lưu bài. Trò "' + g.name + '" cần loại dữ liệu khác (' + KIND_SRC[g.kind] + '), bài này hiện chơi được ' + can.length + ' trò. ', h('div', { class: 'row', style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => go('play', { game: can[0].id, pack: p.id }) }, '▶ Chơi "' + can[0].name + '"'), h('button', { class: 'btn', onclick: () => go('hub') }, 'Xem các trò chơi được'))));
       return;
     }
-    if (action === 'play') go('play', { game: g.id, pack: p.id }); else openShare(p, [g.id]);
+    const ok = ready(), miss = gs.filter(x => !ok.includes(x));
+    if (action !== 'play') return openShare(p, ok.filter(x => x.kind !== 'tool').map(x => x.id));
+    if (ok.length === 1 && !miss.length) return go('play', { game: ok[0].id, pack: p.id });
+    // nhiều trò: hiện danh sách để thầy cô bấm chơi lần lượt trên màn hình
+    status.innerHTML = ''; status.append(h('div', { class: 'card', style: { display: 'grid', gap: '10px', border: '2px solid var(--accent)' } }, h('b', null, 'Bài đã sẵn sàng. Thầy cô bấm trò muốn chơi trước; chơi xong quay lại đây bấm trò tiếp theo:'),
+      h('div', { class: 'row' }, ok.map((x, i) => h('button', { class: 'btn ' + (i ? '' : 'primary') + ' big', onclick: () => go('play', { game: x.id, pack: p.id }) }, '▶ ' + x.name))),
+      miss.length ? h('div', { class: 'small muted' }, 'Chưa chơi được với bài này (thiếu loại dữ liệu trò cần): ' + miss.map(x => x.name + ' – cần ' + KIND_SRC[x.kind]).join('; ') + '.') : null));
+    status.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   const pill = (txt, ok, fn) => h('button', { class: 'pill ' + (ok ? 'ok' : 'warn'), style: { border: 0, cursor: 'pointer' }, onclick: fn }, txt);
   const matPill = pill('Kho tài liệu: …', true, () => goHelp('kho'));
@@ -2823,8 +2844,8 @@ function vHome() {
           h('div', { class: 'f' }, h('span', null, 'Tài liệu tham khảo (SGK, kế hoạch bài dạy) – tải một lần cho môn và khối này'),
             h('div', { class: 'row' }, h('button', { class: 'btn', type: 'button', onclick: () => { if (!Q.subject || !Q.grade) return fieldErr(!Q.subject ? v.querySelector('#q-sub') : gradeSel, 'Thầy cô chọn ' + (!Q.subject ? 'môn học' : 'khối') + ' ở ô này trước, rồi mới tải tài liệu.'); matIn.click(); } }, 'Tải tệp lên'), matIn, h('button', { class: 'btn ghost', type: 'button', onclick: () => goHelp('kho') }, 'Xem / xóa tài liệu trong kho')), matMsg)),
         pagesBox)),
-      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi'), featBox,
-        h('div', { class: 'fgrid' }, f('Tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => { Q.nq = clamp(+e.target.value || 10, 3, 50); saveQ(); } }))))),
+      h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '2'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Chọn trò chơi (chọn được nhiều trò)'), h('div', { class: 'small muted' }, 'Bấm vào trò để chọn, bấm lần nữa để bỏ. Một bài dùng chung câu hỏi cho tất cả các trò đã chọn.'), featBox, pickBox,
+        h('div', { class: 'fgrid' }, f('Thêm từ tất cả ' + GAMES.length + ' trò chơi và công cụ', gameSel), f('Số câu hỏi', h('input', { type: 'number', id: 'q-nq', min: 3, max: 50, value: Q.nq, oninput: e => { Q.nq = clamp(+e.target.value || 10, 3, 50); saveQ(); } }))))),
       h('div', { class: 'qstep' }, h('span', { class: 'qn' }, '3'), h('div', { class: 'grow', style: { display: 'grid', gap: '10px', minWidth: 0 } }, h('h3', null, 'Bắt đầu'),
         h('div', { class: 'f' }, h('span', null, 'Câu hỏi lấy từ đâu (áp dụng cho bài chưa có câu hỏi)'), fromBox),
         h('div', { class: 'f' }, h('span', null, 'Lớp (chỉ cần khi giao bài cho học sinh)'), classBox),
