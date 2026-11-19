@@ -1016,7 +1016,7 @@ function vEditor(id) {
 
   // tài liệu tham khảo
   const fileList = h('div', { class: 'filelist' });
-  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – nhập số trang của bài ở ô bên cạnh' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn danger small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
+  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – khi bấm tạo câu hỏi, app sẽ hỏi bài nằm ở trang nào' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn danger small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
   drawFiles();
   const fileIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md,image/*', hidden: true, onchange: async e => {
     for (const file of e.target.files) {
@@ -1056,8 +1056,15 @@ function vEditor(id) {
     const texts = files.filter(f => f.text).map(f => '=== Tệp: ' + f.name + ' ===\n' + f.text).join('\n\n') + (pasteTa.value.trim() ? '\n\n=== Văn bản dán ===\n' + pasteTa.value : '');
     const images = files.filter(f => f.img).map(f => f.img), scans = files.filter(f => f.scan);
     if (scans.length) {
-      const rg = parsePages(pk.pages), pin = $('#f-pages');
-      if (!rg) { aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note bad' }, 'Tệp "' + scans[0].name + '" là sách dạng ảnh scan nên app cần biết bài nằm ở trang nào. Thầy cô gõ số trang vào ô "Số trang / mục cần bám sát" (ví dụ 38-42, tính theo số trang của tệp PDF, tối đa 8 trang), rồi bấm lại nút này.')); if (pin) { pin.scrollIntoView({ behavior: 'smooth', block: 'center' }); pin.focus({ preventScroll: true }); } return; }
+      // Sách dạng ảnh scan không có chữ: chỉ khi đó mới hỏi số trang, ngay tại đây
+      const rg = parsePages(pk.pages);
+      if (!rg) {
+        const pin = h('input', { type: 'text', id: 'f-pages', placeholder: 'VD: 38-42', value: pk.pages || '', style: { maxWidth: '160px' } });
+        const goOn = () => { if (!parsePages(pin.value)) { pin.focus(); return; } pk.pages = pin.value.trim(); aiGenerate(pk, only); };
+        pin.addEventListener('keydown', e => { if (e.key === 'Enter') goOn(); });
+        aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note', style: { display: 'grid', gap: '8px' } }, h('div', null, 'Tệp "' + scans[0].name + '" là sách dạng ảnh scan nên app cần biết bài nằm ở trang nào của tệp PDF (tối đa 8 trang).'), h('div', { class: 'row' }, pin, h('button', { class: 'btn primary', type: 'button', onclick: goOn }, 'Tiếp tục'))));
+        pin.scrollIntoView({ behavior: 'smooth', block: 'center' }); pin.focus({ preventScroll: true }); return;
+      }
       aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note' }, 'Đang lấy trang ' + rg[0] + (rg[1] > rg[0] ? '–' + rg[1] : '') + ' của sách…'));
       try { for (const f of scans.slice(0, 2)) for (const cv of await renderPages(f.pdf, rg[0], rg[1])) images.push(await cvBlob(cv)); }
       catch (e) { aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note bad' }, 'Chưa mở được các trang đó của tệp PDF. Thầy cô kiểm tra lại số trang.')); return; }
@@ -1095,7 +1102,7 @@ function vEditor(id) {
     h('div', { class: 'card' }, h('h3', null, 'Tài liệu tham khảo'),
       h('p', { class: 'small muted' }, 'SGK, kế hoạch bài dạy, PDF, DOCX, PPTX, ảnh chụp trang sách. Tài liệu chỉ dùng để AI soạn câu hỏi; không gửi danh sách học sinh.'),
       h('div', { class: 'row', style: { marginTop: '10px', alignItems: 'flex-end' } }, h('button', { class: 'btn primary', style: { minHeight: '46px' }, onclick: () => fileIn.click() }, 'Tải tệp lên'), fileIn,
-        h('label', { class: 'f grow' }, h('span', null, 'Số trang / mục cần bám sát'), inp('pages', { placeholder: 'VD: trang 38–42, mục 2' }))),
+        h('label', { class: 'f grow' }, h('span', null, 'Lưu ý thêm (không bắt buộc)'), inp('note', { placeholder: 'VD: tập trung phần thực hành; câu hỏi ngắn gọn, vừa sức học sinh' }))),
       fileList, pasteTa, aiBox),
     h('div', { class: 'card' }, h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Kiểm duyệt / chỉnh sửa nội dung'), regen),
       h('p', { class: 'small muted' }, 'Mỗi mục nuôi một nhóm trò chơi. Sửa trực tiếp từng dòng; sửa một câu không làm mất các câu khác.'),
@@ -1818,7 +1825,7 @@ function buildPrompt(pk, only, texts, hasMat) {
   const keys = only ? [only] : ['q', 'pairs', 'words', 'keyword', 'seq', 'groups', 'tf', 'cloze'];
   const lv = pk.levels || { nb: 40, th: 40, vd: 20 };
   return `Bạn là giáo viên cốt cán THCS Việt Nam, soạn nội dung trò chơi học tập theo Chương trình GDPT 2018.
-THÔNG TIN BÀI: Trường THCS Đồng Hợp. Môn: ${pk.subject || '(chưa ghi)'}. Khối lớp: ${pk.grade || '(chưa ghi)'}. Bài: ${pk.lesson || pk.title || '(chưa ghi)'}. Số tiết của bài: ${pk.periods || 1}. Phạm vi cần soạn: ${pk.period || 'Toàn bài'}. Mục đích: ${pk.purpose || 'Luyện tập'}. ${pk.pages ? 'Bám sát các trang/mục: ' + pk.pages + '.' : ''}
+THÔNG TIN BÀI: Trường THCS Đồng Hợp. Môn: ${pk.subject || '(chưa ghi)'}. Khối lớp: ${pk.grade || '(chưa ghi)'}. Bài: ${pk.lesson || pk.title || '(chưa ghi)'}. Số tiết của bài: ${pk.periods || 1}. Phạm vi cần soạn: ${pk.period || 'Toàn bài'}. Mục đích: ${pk.purpose || 'Luyện tập'}. ${pk.pages ? 'Bám sát các trang/mục: ' + pk.pages + '.' : ''}${pk.note ? ' LƯU Ý THÊM CỦA GIÁO VIÊN (phải làm theo): ' + String(pk.note).slice(0, 600) + '.' : ''}
 Tỉ lệ mức độ câu trắc nghiệm: Nhận biết ${lv.nb}%, Thông hiểu ${lv.th}%, Vận dụng ${lv.vd}%.
 ${hasMat ? 'CHỈ dùng kiến thức có trong tài liệu dưới đây (và tệp/ảnh đính kèm nếu có). Không thêm kiến thức ngoài phạm vi tài liệu.' : 'KHÔNG có tài liệu: soạn theo kiến thức phổ thông chuẩn của sách giáo khoa hiện hành, KHÔNG nêu số trang SGK, ghi rõ trong "check" rằng đây là bản nháp chưa đối chiếu SGK.'}
 Yêu cầu chất lượng: chính xác tuyệt đối về kiến thức, tiếng Việt chuẩn, không đáp án kép, không câu mơ hồ, phương án nhiễu hợp lí, không trùng lặp, phù hợp lứa tuổi.
@@ -2475,7 +2482,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.19-0846';
+const BUILD = '2026.11.19-0848';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
