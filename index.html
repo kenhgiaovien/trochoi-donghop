@@ -989,6 +989,18 @@ function vEditor(id) {
   const fld = (label, el, extra) => h('label', { class: 'f' }, h('span', null, label), el, extra || null);
   const seg = (k, opts, onPick) => { const w = h('div', { class: 'seg', role: 'group' }); opts.forEach(o => w.append(h('button', { type: 'button', 'aria-pressed': String(p[k]) === String(o), onclick: () => { set(k, String(o)); w.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.textContent === String(o))); onPick && onPick(); } }, String(o)))); return w; };
 
+  // Tên bài: có phân phối chương trình thì chọn khối là danh sách bài sổ ra, không phải gõ tay
+  let lsList = [];
+  const lessonPick = h('select', { id: 'f-lessonpick', hidden: true, onchange: e => { const t = e.target.value; if (!t) return; const l = lsList.find(x => x.t === t); p.lesson = t; p.title = t; const li = $('#f-lesson'); if (li) li.value = t; if (l && l.n) { set('periods', l.n); const pi = $('#f-periods'); if (pi) pi.value = l.n; } } });
+  const drawLessonPick = open => {
+    const g = String(p.grade || ''), pp = S.ppct || {}; let k = ppKey(p.subject || '', g);
+    if (g && !(pp[k] || []).length && !String(p.subject || '').trim()) { const has = Object.keys(pp).filter(x => x.endsWith('|' + g) && pp[x].length).map(x => x.slice(0, x.lastIndexOf('|'))), pick = has.find(s => mySubjects().includes(s)) || has[0]; if (pick) { p.subject = pick; const si = $('#f-subject'); if (si) si.value = pick; k = ppKey(pick, g); } }
+    lsList = (pp[k] || []).concat(((S.matLessons || {})[k] || []).filter(l => !(pp[k] || []).some(x => norm(x.t) === norm(l.t))));
+    lessonPick.innerHTML = ''; lessonPick.hidden = !lsList.length;
+    lessonPick.append(h('option', { value: '' }, '— Bấm để chọn bài (' + lsList.length + ' bài của ' + (p.subject || '') + ' ' + g + ') —'), ...lsList.map(l => h('option', { value: l.t, selected: p.lesson === l.t }, l.t)));
+    if (open && lsList.length) { try { lessonPick.focus({ preventScroll: true }); if (lessonPick.showPicker) lessonPick.showPicker(); } catch (e) { } }
+  };
+  drawLessonPick(false);
   // lớp tự lọc theo khối
   const classBox = h('div', { class: 'chips' });
   const drawClasses = () => {
@@ -1016,7 +1028,7 @@ function vEditor(id) {
 
   // tài liệu tham khảo
   const fileList = h('div', { class: 'filelist' });
-  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – khi bấm tạo câu hỏi, app sẽ hỏi bài nằm ở trang nào' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn danger small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
+  const drawFiles = () => { fileList.innerHTML = ''; MAT.forEach((f, i) => fileList.append(h('div', null, h('span', { class: 'n' }, f.name), h('span', { class: 'pill ' + (f.status === 'ok' ? 'ok' : f.status === 'err' ? 'bad' : '') }, f.status === 'ok' ? (f.img ? 'Ảnh – gửi cho AI' : f.scan ? 'Sách dạng ảnh scan' + (f.pages ? ', ' + f.pages + ' trang' : '') + ' – app sẽ tự tìm trang của bài theo tên bài' : 'Đã đọc ' + f.text.length.toLocaleString('vi-VN') + ' ký tự') : f.status === 'err' ? 'Lỗi: ' + f.msg : 'Đang đọc…'), h('button', { class: 'btn danger small', onclick: () => { MAT.splice(i, 1); drawFiles(); } }, 'Bỏ')))); };
   drawFiles();
   const fileIn = h('input', { type: 'file', multiple: true, accept: '.pdf,.docx,.pptx,.txt,.md,image/*', hidden: true, onchange: async e => {
     for (const file of e.target.files) {
@@ -1024,7 +1036,7 @@ function vEditor(id) {
       if (/\.pdf$/i.test(file.name)) f.pdf = file;
       try { if (file.type.startsWith('image/')) { f.img = file; f.text = ''; } else f.text = (await extractText(file)).replace(/\n{3,}/g, '\n\n'); f.status = 'ok'; }
       // PDF dạng ảnh scan (không có chữ): vẫn nhận, khi tạo câu hỏi sẽ gửi ảnh các trang của bài cho AI
-      catch (err) { if (f.pdf) { f.status = 'ok'; f.text = ''; f.scan = true; try { f.pages = (await scanInfo(file)).pages; } catch (e2) { } } else { f.status = 'err'; f.msg = err.message || 'không đọc được'; } }
+      catch (err) { if (f.pdf) { f.status = 'ok'; f.text = ''; f.scan = true; try { const info = await scanInfo(file); f.pages = info.pages; f.outline = info.outline; } catch (e2) { } } else { f.status = 'err'; f.msg = err.message || 'không đọc được'; } }
       drawFiles();
     }
     e.target.value = '';
@@ -1057,12 +1069,17 @@ function vEditor(id) {
     const images = files.filter(f => f.img).map(f => f.img), scans = files.filter(f => f.scan);
     if (scans.length) {
       // Sách dạng ảnh scan không có chữ: chỉ khi đó mới hỏi số trang, ngay tại đây
-      const rg = parsePages(pk.pages);
+      let rg = parsePages(pk.pages);
+      if (!rg) {
+        // tự dò trang của bài theo tên bài (mục lục điện tử, hoặc đọc mục lục bằng OCR) trước khi phải hỏi
+        const f0 = scans[0]; f0.m = f0.m || { blob: f0.pdf, name: f0.name, pages: f0.pages, outline: f0.outline || [] };
+        try { const pg = await autoScanPages(f0.m, pk, t => { aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note' }, t)); }); if (pg) { pk.pages = pg; rg = parsePages(pg); } } catch (e) { }
+      }
       if (!rg) {
         const pin = h('input', { type: 'text', id: 'f-pages', placeholder: 'VD: 38-42', value: pk.pages || '', style: { maxWidth: '160px' } });
         const goOn = () => { if (!parsePages(pin.value)) { pin.focus(); return; } pk.pages = pin.value.trim(); aiGenerate(pk, only); };
         pin.addEventListener('keydown', e => { if (e.key === 'Enter') goOn(); });
-        aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note', style: { display: 'grid', gap: '8px' } }, h('div', null, 'Tệp "' + scans[0].name + '" là sách dạng ảnh scan nên app cần biết bài nằm ở trang nào của tệp PDF (tối đa 8 trang).'), h('div', { class: 'row' }, pin, h('button', { class: 'btn primary', type: 'button', onclick: goOn }, 'Tiếp tục'))));
+        aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note', style: { display: 'grid', gap: '8px' } }, h('div', null, 'App chưa tự tìm được bài này trong tệp "' + scans[0].name + '" (bản ảnh scan). Thầy cô cho biết bài nằm ở trang nào của tệp PDF (tối đa 8 trang):'), h('div', { class: 'row' }, pin, h('button', { class: 'btn primary', type: 'button', onclick: goOn }, 'Tiếp tục'))));
         pin.scrollIntoView({ behavior: 'smooth', block: 'center' }); pin.focus({ preventScroll: true }); return;
       }
       aiStatus.innerHTML = ''; aiStatus.append(h('div', { class: 'note' }, 'Đang lấy trang ' + rg[0] + (rg[1] > rg[0] ? '–' + rg[1] : '') + ' của sách…'));
@@ -1088,9 +1105,9 @@ function vEditor(id) {
       h('div', { class: 'fgrid', style: { marginTop: '12px' } },
         fld('Trường', h('input', { type: 'text', value: 'Trường THCS Đồng Hợp', disabled: true })),
         fld('Họ và tên giáo viên', inp('teacher', { list: 'tlist', placeholder: 'VD: Nguyễn Văn A' }), h('datalist', { id: 'tlist' }, tchList.map(t => h('option', { value: t })))),
-        fld('Môn học', inp('subject', { list: 'slist', placeholder: 'Chọn hoặc nhập môn' }), h('datalist', { id: 'slist' }, SUBJECTS.map(t => h('option', { value: t })))),
-        fld('Khối', seg('grade', [6, 7, 8, 9], drawClasses)),
-        fld('Tên bài học', inp('lesson', { placeholder: 'VD: Bài 9. Đông Nam Á từ nửa sau thế kỉ XVI…', oninput: e => { p.lesson = e.target.value; p.title = e.target.value; } })),
+        fld('Môn học', inp('subject', { list: 'slist', placeholder: 'Chọn hoặc nhập môn', onchange: () => drawLessonPick(false) }), h('datalist', { id: 'slist' }, SUBJECTS.map(t => h('option', { value: t })))),
+        fld('Khối', seg('grade', [6, 7, 8, 9], () => { drawClasses(); drawLessonPick(true); })),
+        h('label', { class: 'f' }, h('span', null, 'Tên bài học'), lessonPick, inp('lesson', { placeholder: 'VD: Bài 9. Đông Nam Á từ nửa sau thế kỉ XVI…', 'aria-label': 'Tên bài học', oninput: e => { p.lesson = e.target.value; p.title = e.target.value; } })),
         fld('Số tiết của bài', inp('periods', { type: 'number', min: 1, max: 20 })),
         fld('Tiết cần tạo', sel('period', ['Một tiết', 'Nhiều tiết', 'Toàn bài'])),
         fld('Mục đích', sel('purpose', ['Khởi động', 'Luyện tập', 'Củng cố', 'Ôn tập', 'Đánh giá'])),
@@ -2055,7 +2072,7 @@ async function refreshMatLessons() {
   const map = {}, scan = {};
   (await matAll()).forEach(m => {
     if (!m.subject || !m.grade) return; const k = ppKey(m.subject, m.grade);
-    if (m.scan) { (scan[k] = scan[k] || []).push({ name: m.name, pages: m.pages, outline: m.outline || [] }); return; }
+    if (m.scan) { (scan[k] = scan[k] || []).push({ name: m.name, pages: m.pages, outline: m.outline || [], ocr: !!m.heads }); return; }
     const ls = m.lessons || (m.lessons = lessonsFromText(m.text)); map[k] = (map[k] || []).concat(ls.filter(l => !(map[k] || []).some(x => norm(x.t) === norm(l.t))));
   });
   const changed = JSON.stringify([map, scan]) !== JSON.stringify([S.matLessons, S.matScan]); S.matLessons = map; S.matScan = scan; return changed;
@@ -2104,10 +2121,81 @@ async function addToKho(file, subject, grade, kind) {
   if (text.replace(/\[Trang \d+\]|\s/g, '').length >= 200) rec.text = text.slice(0, 3000000);
   else if (isPdf) { const info = await scanInfo(file); rec.scan = true; rec.blob = file; rec.pages = info.pages; rec.outline = info.outline; }
   else throw new Error('tệp không có chữ');
-  await matPut(rec); return rec;
+  await matPut(rec);
+  // sách ảnh không có mục lục điện tử: dò sẵn tiêu đề các trang ở nền, để lúc tạo câu hỏi app tự tìm được bài theo tên
+  if (rec.scan && !(rec.outline || []).length && IS_WEB) ocrIndex(rec).then(() => matPut(rec)).then(() => refreshMatLessons()).catch(() => { });
+  return rec;
+}
+/* --- Sách scan (ảnh, không có chữ, không có mục lục điện tử): tự đọc (OCR) phần đầu mỗi trang, giữ lại các dòng tiêu đề viết hoa.
+       Làm MỘT lần cho mỗi cuốn (vài phút), kết quả lưu trong kho; từ đó app tự tìm trang của bài theo TÊN BÀI. --- */
+const dePlain = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+// các dòng tiêu đề (viết hoa) ở đầu trang, bỏ dấu, ngăn nhau bằng " | "
+const headText = text => String(text || '').split(/\n/).filter(l => { const a = l.replace(/[^A-Za-zÀ-ỹ]/g, ''), u = a.replace(/[^A-ZÀ-Ỹ]/g, ''); return a.length >= 4 && u.length / a.length > 0.7; }).map(l => dePlain(l).replace(/[^a-z0-9]+/g, ' ').trim()).filter(Boolean).join(' | ');
+S.ocrJobs = S.ocrJobs || {};
+function ocrIndex(m, say) {
+  const jid = m.id || '_', old = S.ocrJobs[jid];
+  if (old && old.blob === m.blob) { if (say) old.says.push(say); return old.promise; }   // một cuốn chỉ chạy một lượt, ai cần thì cùng chờ
+  const J = { blob: m.blob, says: say ? [say] : [] }; S.ocrJobs[jid] = J;
+  const tell = t => J.says.forEach(f => { try { f(t); } catch (e) { } });
+  J.promise = (async () => {
+    const T = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js', 'Tesseract');
+    const w = await T.createWorker('vie'), heads = {};
+    try {
+      const doc = await pdfDoc(m.blob), N = doc.numPages;
+      for (let p = 1; p <= N; p++) {
+        if (p % 3 === 1) tell('App đang tự dò tên các bài trong sách "' + (m.name || 'PDF') + '": trang ' + p + '/' + N + ' (' + Math.round(p * 100 / N) + '%). Việc này chỉ làm một lần cho mỗi cuốn sách, thầy cô chờ giúp vài phút.');
+        const pg = await doc.getPage(p), v0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: 900 / v0.width });
+        const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height * 0.42);
+        await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        heads[p] = headText((await w.recognize(cv)).data.text).slice(0, 600);
+      }
+    } finally { try { await w.terminate(); } catch (e) { } }
+    m.heads = heads; m.ocr = true; return true;
+  })();
+  J.promise.catch(() => { }).then(() => { if (S.ocrJobs[jid] === J) delete S.ocrJobs[jid]; });
+  return J.promise;
+}
+/* Trang có tiêu đề khớp tên bài. Chỉ nhận khi khớp chặt: gần đủ các từ của tên bài VÀ dòng tiêu đề không dài hơn tên bài nhiều
+   (để "Thuỷ văn Việt Nam" không bị nhận nhầm vào bài "Tác động của biến đổi khí hậu đối với khí hậu và thuỷ văn Việt Nam"). */
+function pageByTitle(m, title) {
+  const ws = dePlain(String(title || '').replace(/^\s*(bài|chủ đề|unit|tiết)\s*\d+\s*[.:\-–]?\s*/i, '').replace(/\([^)]*\)\s*$/, '')).split(/[^a-z0-9]+/).filter(x => x.length > 1);
+  if (ws.length < 2 || !m.heads) return null;
+  const sc = [];
+  Object.keys(m.heads).forEach(p => {
+    const lines = String(m.heads[p]).split('|').map(l => l.trim().split(' ').filter(x => x.length > 1)).filter(l => l.length);
+    if (lines.reduce((a, l) => a + l.length, 0) > 60 || / muc luc | noi dung trang /.test(' ' + lines.map(l => l.join(' ')).join(' ') + ' ')) return;   // trang mục lục: bỏ qua
+    let best = 0;
+    for (let i = 0; i < lines.length; i++) for (let k = 1; k <= 3 && i + k <= lines.length; k++) {
+      const win = [].concat.apply([], lines.slice(i, i + k)).filter(x => !/^(bai|\d+)$/.test(x)); if (!win.length) continue;
+      const hit = ws.filter(x => win.includes(x)).length, r = hit / ws.length, pr = hit / win.length;
+      if (r >= 0.8 && pr >= 0.6) best = Math.max(best, r * 0.6 + pr * 0.4);
+    }
+    if (best) sc.push({ p: +p, s: best });
+  });
+  sc.sort((a, b) => b.s - a.s || a.p - b.p);
+  const top = sc[0]; if (!top) return null;
+  const rival = sc.find(x => Math.abs(x.p - top.p) > 1);
+  return !rival || top.s - rival.s >= 0.1 ? top.p : null;
+}
+/* Tìm trang của bài trong một cuốn sách scan: mục lục điện tử → tự dò tiêu đề bằng OCR → (cùng lắm) hỏi giáo viên */
+async function autoScanPages(m, pk, say, ask) {
+  const lesson = pk.lesson || pk.title || '';
+  let pg = m.ocr ? '' : guessPages(m.outline, lesson);
+  if (!pg) {
+    if (!m.heads) { try { await ocrIndex(m, say); if (m.id) { await matPut(m); } } catch (e) { } }
+    const a = pageByTitle(m, lesson);
+    if (a) {
+      // điểm dừng: trang đầu của bài kế tiếp trong phân phối chương trình (nếu dò được), không thì lấy 6 trang
+      const list = (S.ppct || {})[ppKey(pk.subject || '', pk.grade || '')] || [], i = list.findIndex(l => norm(l.t) === norm(lesson));
+      const nx = i >= 0 && list[i + 1] ? pageByTitle(m, list[i + 1].t) : null;
+      pg = a + '-' + (nx && nx > a && nx <= a + 8 ? nx - 1 : a + 5);
+    }
+  }
+  if (!pg && ask) pg = await ask();
+  return pg || '';
 }
 function guessPages(outline, lesson) {
-  const no = lessonNo(lesson), bare = norm(lesson.replace(/^\s*(bài|chủ đề|unit)\s*\d+\s*[.:\-–]?\s*/i, ''));
+  const no = lessonNo(lesson), bare = norm(String(lesson || '').replace(/^\s*(bài|chủ đề|unit)\s*\d+\s*[.:\-–]?\s*/i, ''));
   const i = (outline || []).findIndex(o => (no != null && lessonNo(o.t) === no) || (bare.length > 5 && norm(o.t).includes(bare)));
   if (i < 0) return ''; const a = outline[i].p, nx = outline.slice(i + 1).find(o => o.p > a);
   return a + '-' + Math.min(nx ? nx.p - 1 : a + 5, a + 7);
@@ -2162,7 +2250,25 @@ async function runAI(pk, opt) {
   let texts = opt.texts || '', used = [];
   if (!opt.paste && !texts.trim()) { const g = await gatherMaterial(pk); texts = g.texts; used = g.used; }
   const images = (opt.images || []).slice(), pdfs = (opt.pdfs || []).filter(b => b.size < 8e6);
-  if (!opt.paste && !texts.trim() && !images.length) { say(h('div', { class: 'note' }, 'Đang lấy các trang sách của bài…')); try { const sc = await scanImages(pk); sc.forEach(b => images.push(b)); if (sc.length) used.push('ảnh ' + sc.length + ' trang sách (trang ' + pk.pages + ')'); } catch (e) { } }
+  if (!opt.paste && !texts.trim() && !images.length) {
+    // Sách dạng ảnh scan: app tự tìm trang của bài theo tên bài; chỉ khi không tìm nổi mới hỏi thầy cô
+    try {
+      const sm = (await matAll()).find(m => m.scan && m.blob && m.subject === pk.subject && String(m.grade) === String(pk.grade));
+      if (sm) {
+        const note = t => say(h('div', { class: 'note' }, t));
+        const ask = () => new Promise(res => {
+          const pin = h('input', { type: 'text', id: 'q-pages', placeholder: 'VD: 38-42', style: { maxWidth: '160px' } });
+          const go1 = () => { if (parsePages(pin.value)) res(pin.value.trim()); else pin.focus(); };
+          pin.addEventListener('keydown', e => { if (e.key === 'Enter') go1(); });
+          say(h('div', { class: 'note', style: { display: 'grid', gap: '8px' } }, h('div', null, 'App chưa tự tìm được bài "' + (pk.lesson || '') + '" trong sách "' + sm.name + '" (bản ảnh scan, app nhận dạng tiêu đề bài này chưa đủ chắc chắn). Thầy cô cho biết bài nằm ở trang nào của tệp PDF:'),
+            h('div', { class: 'row' }, pin, h('button', { class: 'btn primary', type: 'button', onclick: go1 }, 'Tiếp tục'), h('button', { class: 'btn', type: 'button', onclick: () => res('') }, 'Bỏ qua, soạn không dùng sách'))));
+          pin.focus();
+        });
+        if (!parsePages(pk.pages)) pk.pages = await autoScanPages(sm, pk, note, ask);
+        if (parsePages(pk.pages)) { note('Đang lấy các trang sách của bài (trang ' + pk.pages + ')…'); const sc = await scanImages(pk); sc.forEach(b => images.push(b)); if (sc.length) used.push('ảnh ' + sc.length + ' trang sách (trang ' + pk.pages + ')'); }
+      }
+    } catch (e) { }
+  }
   const hasMat = !!(texts.trim() || images.length || pdfs.length);
   const prompt = buildPrompt(pk, opt.only, texts, hasMat);
   const finish = (o, byHand) => {
@@ -2482,7 +2588,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.19-1010';
+const BUILD = '2026.11.23-0844';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2751,22 +2857,23 @@ function vHome() {
   } });
   const pgKey = () => key() + '|' + norm(lessonName());
   function fillPages() {
-    pagesBox.innerHTML = ''; const scans = S.matScan[key()] || []; if (!scans.length) return;
-    const prev = h('div', { class: 'row' });
-    const pIn = h('input', { type: 'text', id: 'q-pages', placeholder: 'VD: 30-34', value: S.pages[pgKey()] || guessPages(scans[0].outline, lessonName()), style: { maxWidth: '160px' }, oninput: e => { S.pages[pgKey()] = e.target.value.trim(); LS.set('dh.pages', S.pages); } });
-    pagesBox.append(h('div', { class: 'f' }, h('span', null, 'Bài nằm ở trang nào của tệp PDF (sách dạng ảnh scan, ' + scans[0].pages + ' trang)'),
-      h('div', { class: 'row' }, pIn, h('button', { class: 'btn', type: 'button', onclick: async () => {
-        const rg = parsePages(pIn.value); if (!rg) return warn('Nhập trang theo dạng 30-34 (số trang của tệp PDF).');
-        prev.innerHTML = ''; prev.append('Đang mở trang…');
-        try { const m = (await matAll()).find(x => x.scan && x.blob && x.subject === Q.subject && String(x.grade) === String(Q.grade)); const cvs = (await renderPages(m.blob, rg[0], rg[0], 260)).concat(rg[1] > rg[0] ? await renderPages(m.blob, rg[1], rg[1], 260) : []); prev.innerHTML = ''; cvs.forEach((cv, i) => { cv.style.border = '1px solid var(--line)'; cv.style.maxWidth = '45%'; prev.append(h('div', { style: { display: 'grid', gap: '4px' } }, h('span', { class: 'small muted' }, i ? 'Trang cuối: ' + rg[1] : 'Trang đầu: ' + rg[0]), cv)); }); }
-        catch (err) { prev.innerHTML = ''; prev.append('Chưa mở được trang.'); }
-      } }, 'Xem thử trang')),
-      h('span', { class: 'small muted' }, 'Sách scan không có chữ nên app gửi ảnh các trang này cho AI đọc (tối đa 8 trang). Nhập một lần cho mỗi bài, app tự nhớ.'), prev));
+    // Không hỏi số trang nữa: app tự dò bài trong tài liệu theo tên bài. Ở đây chỉ báo cho thầy cô biết.
+    pagesBox.innerHTML = ''; const scans = S.matScan[key()] || []; if (!scans.length || !lessonName()) return;
+    const pg = S.pages[pgKey()] || guessPages(scans[0].outline, lessonName());
+    pagesBox.append(h('div', { class: 'small muted' }, pg ? 'Sách "' + scans[0].name + '" là bản ảnh scan: app đã tự tìm thấy bài này ở trang ' + pg + '.' : scans[0].ocr ? 'Sách "' + scans[0].name + '" là bản ảnh scan: app đã dò xong tiêu đề các trang, khi tạo câu hỏi sẽ tự tìm bài theo tên bài.' : 'Sách "' + scans[0].name + '" là bản ảnh scan: app tự dò tên bài trong sách (lần đầu với mỗi cuốn mất vài phút, sau đó không phải chờ nữa).'));
   }
   // --- môn, khối ---
-  const onSG = () => { Q.lesson = ''; Q.period = 'Toàn bài'; saveQ(); fillLessons(); fillClasses(); fillMat(); };
-  const subBox = h('span', { style: { display: 'grid', gap: '6px' } }); subBox.append(...subjectPicker('q-sub', Q.subject, val => { Q.subject = val; onSG(); }));
-  const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.classes = []; onSG(); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
+  // Chọn khối là danh sách bài sổ ra ngay: nếu môn đang chọn chưa có phân phối chương trình của khối đó thì tự chuyển sang môn đã có
+  const autoSubject = () => {
+    if (!Q.grade || (S.ppct[key()] || []).length) return;
+    const has = Object.keys(S.ppct).filter(k => k.endsWith('|' + Q.grade) && (S.ppct[k] || []).length).map(k => k.slice(0, k.lastIndexOf('|'))); if (!has.length) return;
+    const mine = mySubjects(), pick = has.find(s => mine.includes(s)) || has[0];
+    Q.subject = pick; const s = v.querySelector('#q-sub'); if (s) { if (![...s.options].some(o => o.value === pick)) s.append(h('option', { value: pick }, pick)); s.value = pick; }
+  };
+  const openLessons = () => { if (!list.length) return; try { lessonSel.focus({ preventScroll: true }); if (lessonSel.showPicker) lessonSel.showPicker(); } catch (e) { } };
+  const onSG = byUser => { if (byUser === 'grade') autoSubject(); Q.lesson = ''; Q.period = 'Toàn bài'; saveQ(); fillLessons(); fillClasses(); fillMat(); if (byUser) openLessons(); };
+  const subBox = h('span', { style: { display: 'grid', gap: '6px' } }); subBox.append(...subjectPicker('q-sub', Q.subject, val => { Q.subject = val; onSG('subject'); }));
+  const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.classes = []; onSG('grade'); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
   // --- trò chơi ---
   const featured = ['m2', 'q2', 'q5', 'q4', 'w1', 'p2', 'q12', 'q16', 'q1'];
   // Chọn được NHIỀU trò cho một bài: bấm thẻ để chọn/bỏ, hoặc thêm từ ô sổ xuống
