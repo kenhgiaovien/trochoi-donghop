@@ -286,6 +286,24 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 .pickg{background:color-mix(in srgb,var(--accent) 12%,var(--card));color:var(--accent);font-size:13px;padding:4px 6px 4px 12px}
 .pickg button{border:0;background:none;color:inherit;cursor:pointer;font-weight:700;padding:2px 6px;border-radius:50%}
 .pickg button:hover{background:color-mix(in srgb,var(--accent) 22%,var(--card))}
+/* Khởi động */
+.warm2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start}
+.warmol{margin:6px 0 10px;padding-left:22px;display:grid;gap:6px;line-height:1.45}
+.warmwho{text-align:center;font-size:clamp(34px,6vw,76px);min-height:1.2em;color:var(--accent)}
+.warmplay{display:grid;justify-items:center}
+.lanes{display:grid;gap:8px;width:100%;max-width:760px}
+.lane{display:grid;grid-template-columns:minmax(120px,220px) 1fr;gap:10px;align-items:center;font-weight:600}
+.lname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ltrack{height:22px;border-radius:99px;background:var(--soft);overflow:hidden}
+.ltrack i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .12s linear}
+.lane.win .ltrack i{background:var(--ok)}
+.lane.win .lname{color:var(--ok)}
+.warmq{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.warmopts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.warmopts>div{border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.warmstage:fullscreen{overflow:auto;padding:28px 36px;font-size:21px;border-radius:0;align-content:start}
+.warmstage:fullscreen .small{font-size:16px}
+.warmstage:fullscreen h2{font-size:38px}
 /* Bảng dữ liệu dùng chung */
 .shpanel{display:grid;gap:8px;border:1px solid var(--line);border-radius:14px;padding:14px;background:color-mix(in srgb,var(--accent) 3%,var(--card));min-width:0}
 .shhead{display:grid;gap:2px;margin-bottom:2px}
@@ -920,7 +938,7 @@ function render() {
   else nav.append(h('button', { type: 'button', 'aria-current': 'page' }, 'Học sinh tham gia'));
   const lb = $('#logoBox'); lb.innerHTML = ''; lb.append(h('img', { src: S.logo || DEFAULT_LOGO, alt: 'Logo trường' }));
   const m = $('#main'); m.innerHTML = '';
-  const V = { home: vHome, library: vLibrary, editor: vEditor, hub: vHub, roster: vRoster, scores: vScores, help: vHelp, join: vJoin, play: vPlay, peer: vPeer }[S.view] || vHome;
+  const V = { home: vHome, library: vLibrary, editor: vEditor, hub: vHub, roster: vRoster, scores: vScores, help: vHelp, join: vJoin, play: vPlay, peer: vPeer, warm: vWarm }[S.view] || vHome;
   m.append(V(S.arg));
 }
 
@@ -1045,7 +1063,13 @@ function vEditor(id) {
   const drawClasses = () => {
     classBox.innerHTML = '';
     const g = String(p.grade || ''), all = S.roster ? Object.keys(S.roster.classes).filter(c => c.startsWith(g || '#')).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
-    if (!g) { classBox.append(h('span', { class: 'small muted' }, 'Chọn khối ở trên để hiện các lớp.')); return; }
+    if (!g) {
+      // chưa chọn khối: đã có danh sách học sinh thì vẫn sổ ra tất cả các lớp để chọn (bấm lớp nào, app tự chọn khối của lớp đó)
+      const every = S.roster ? Object.keys(S.roster.classes).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
+      if (!every.length) { classBox.append(h('span', { class: 'small muted' }, 'Chưa có danh sách học sinh: tải lên ở bảng "Dữ liệu dùng chung" bên dưới, các lớp sẽ hiện ở đây để bấm chọn.')); return; }
+      every.forEach(c => classBox.append(h('button', { type: 'button', class: 'chip', onclick: () => { const gb = [...document.querySelectorAll('.seg button')].find(b => b.textContent === c[0]); p.classes = [c]; if (gb) gb.click(); else { set('grade', c[0]); drawClasses(); } } }, c, h('span', { class: 'small', style: { opacity: .7 } }, ' · ' + S.roster.classes[c].length))));
+      return;
+    }
     if (!all.length) {
       // chưa có danh sách lớp của khối này: vẫn chọn được "Cả khối", hoặc gõ tên lớp
       const whole = 'Khối ' + g, inp1 = h('input', { type: 'text', id: 'f-classes', placeholder: 'hoặc gõ tên lớp, VD: ' + g + 'A, ' + g + 'B', value: p.classes.filter(c => c !== whole).join(', '), style: { maxWidth: '300px' }, oninput: e => { p.classes = e.target.value.split(/[,;\s]+/).filter(Boolean); chipAll.setAttribute('aria-pressed', 'false'); } });
@@ -2633,7 +2657,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.23-1523';
+const BUILD = '2026.11.23-1551';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -3159,7 +3183,7 @@ function sharedPanel(getSG, onChange) {
   async function draw() {
     const sg = getSG() || {}, subject = String(sg.subject || '').trim(), grade = String(sg.grade || '');
     box.innerHTML = '';
-    box.append(h('div', { class: 'shhead' }, h('b', null, 'Dữ liệu dùng chung' + (subject && grade ? ' – ' + subject + ', khối ' + grade : '')), h('span', { class: 'small muted' }, 'Tải lên một lần, app tự dùng cho mọi việc: chọn bài, soạn câu hỏi, giao bài, bảng điểm.')));
+    box.append(h('div', { class: 'shhead' }, h('b', null, 'Dữ liệu dùng chung'), h('span', { class: 'small muted' }, 'Tải lên một lần, app tự dùng cho mọi việc: chọn bài, soạn câu hỏi, giao bài, bảng điểm.')));
     if (!subject || !grade) { box.append(h('div', { class: 'small muted' }, 'Thầy cô chọn môn và khối, app sẽ kiểm tra dữ liệu nào đã có, dữ liệu nào còn thiếu.')); return; }
     const k = ppKey(subject, grade), pp = S.ppct[k] || [];
     let mats = []; try { mats = (await matAll()).filter(m => m.subject === subject && String(m.grade) === String(grade)); } catch (e) { }
@@ -3194,9 +3218,10 @@ function sharedPanel(getSG, onChange) {
       let n = 0, bad = 0;
       for (const f of fs) { say('Đang đọc ' + f.name + '…'); try { const r = await rosterFromFile(f); S.roster = S.roster || { classes: {}, year: '2026-2027', history: [] }; Object.keys(r).forEach(c => { if (r[c] && r[c].length) { S.roster.classes[c] = r[c]; n++; } }); } catch (e) { bad++; } }
       if (n) saveRoster();
-      say(n ? 'Đã lưu danh sách ' + n + ' lớp.' + (bad ? ' Có ' + bad + ' tệp không đọc được.' : '') : 'Chưa đọc được danh sách lớp trong tệp. Tệp Excel cần có cột Lớp và cột Họ và tên.', !n); changed('roster'); draw();
+      const allC = S.roster ? Object.keys(S.roster.classes).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
+      say(n ? 'Đã nhận ' + n + ' lớp từ tệp, học sinh xếp đúng lớp và đúng thứ tự trong tệp. Hiện có: ' + ['6', '7', '8', '9'].map(g => { const l = allC.filter(c => c.startsWith(g)); return l.length ? 'khối ' + g + ' – ' + l.join(', ') : ''; }).filter(Boolean).join('; ') + '.' + (bad ? ' Có ' + bad + ' tệp không đọc được.' : '') : 'Chưa đọc được danh sách lớp trong tệp. Tệp Excel cần có cột Lớp và cột Họ và tên.', !n); changed('roster'); draw();
     });
-    box.append(row(cls.length > 0, 'Danh sách học sinh khối ' + grade, cls.length ? cls.length + ' lớp, ' + nStu + ' học sinh: ' + cls.join(', ') + '.' : 'Chưa có – cần để giao bài theo lớp, học sinh bấm chọn tên, và xuất sổ điểm.',
+    box.append(row(cls.length > 0, 'Danh sách học sinh khối ' + grade, cls.length ? cls.length + ' lớp, ' + nStu + ' học sinh: ' + cls.join(', ') + '.' : 'Chưa có – tải một tệp Excel có cột Lớp và cột Họ và tên (một tệp chứa nhiều lớp, nhiều khối cũng được): app tự xếp học sinh vào đúng lớp, giữ đúng thứ tự.',
       h('button', { class: 'btn small' + (cls.length ? '' : ' primary'), type: 'button', onclick: () => rosIn.click() }, cls.length ? 'Tải thêm / thay' : 'Tải lên'), rosIn,
       h('button', { class: 'btn ghost small', type: 'button', onclick: () => go('roster') }, 'Xem / sửa')));
     box.append(msg);
@@ -4784,6 +4809,166 @@ function vPeerJoin() {
   return v;
 }
 { const __vJoinDg = vJoin; vJoin = function () { return S.shared && S.shared.kind === 'dg' ? vPeerJoin() : __vJoinDg.apply(this, arguments); }; }
+
+/* ===== KHỞI ĐỘNG: ý tưởng mở đầu bài mới và hỏi bài cũ (gọi học sinh ngẫu nhiên) =====
+   Giáo viên chọn môn, khối, lớp, tên bài một lần ở đầu trang; hai thẻ bên dưới dùng chung lựa chọn đó.
+   Dữ liệu lấy từ kho dùng chung: phân phối chương trình (tên bài), danh sách học sinh (lớp), thư viện bài (câu hỏi). */
+NAV.splice(1, 0, ['warm', 'Khởi động']);
+/* Các hoạt động khởi động quen dùng trên thế giới. game = trò có sẵn trong app chạy được ngay với câu hỏi của bài. */
+const WARM_IDEAS = [
+  { id: 'kwl', name: 'K – W – L: Biết – Muốn biết – Học được', from: 'Donna Ogle, 1986', min: 5, tag: 'Kích hoạt kiến thức cũ',
+    how: ['Kẻ bảng 3 cột: ĐÃ BIẾT – MUỐN BIẾT – HỌC ĐƯỢC.', 'Học sinh nêu nhanh những điều đã biết về chủ đề, giáo viên ghi cột 1.', 'Hỏi: "Các em muốn biết thêm điều gì?" – ghi cột 2, dùng làm câu hỏi dẫn vào bài.', 'Cuối tiết quay lại điền cột 3.'],
+    ask: l => ['Các em đã biết gì về "' + l + '"?', 'Các em muốn biết thêm điều gì về "' + l + '"?'] },
+  { id: 'tps', name: 'Nghĩ – Bắt cặp – Chia sẻ', from: 'Think–Pair–Share, Frank Lyman, 1981', min: 4, tag: 'Thảo luận cặp đôi',
+    how: ['Nêu một câu hỏi mở gắn với bài mới.', 'NGHĨ: mỗi em tự nghĩ 1 phút, không nói.', 'BẮT CẶP: trao đổi với bạn bên cạnh 2 phút.', 'CHIA SẺ: gọi ngẫu nhiên 2–3 cặp trình bày, giáo viên dẫn vào bài.'],
+    ask: l => ['Theo em, vì sao chúng ta cần học "' + l + '"?', 'Em đã gặp nội dung của "' + l + '" ở đâu trong đời sống?'] },
+  { id: 'stw', name: 'Thấy – Nghĩ – Thắc mắc', from: 'See–Think–Wonder, Project Zero (Đại học Harvard)', min: 5, tag: 'Quan sát hình ảnh',
+    how: ['Chiếu một hình ảnh, đoạn phim ngắn hoặc sản phẩm mẫu liên quan đến bài.', 'THẤY: em nhìn thấy gì? (chỉ tả, chưa giải thích)', 'NGHĨ: em nghĩ điều gì đang diễn ra?', 'THẮC MẮC: em muốn hỏi điều gì? – các thắc mắc dẫn vào bài mới.'],
+    ask: l => ['Quan sát hình và cho biết: em THẤY gì?', 'Em NGHĨ hình này liên quan thế nào đến "' + l + '"?', 'Em THẮC MẮC điều gì?'] },
+  { id: 'ttl', name: 'Hai sự thật, một điều sai', from: 'Two Truths and a Lie', min: 4, tag: 'Đoán nhanh cả lớp',
+    how: ['Giáo viên đưa 3 phát biểu về chủ đề của bài: 2 đúng, 1 sai.', 'Cả lớp giơ tay (hoặc giơ số 1–2–3) chọn phát biểu sai.', 'Chưa công bố đáp án ngay: "Học xong bài hôm nay các em sẽ tự kiểm tra."', 'Cuối tiết quay lại chốt.'],
+    ask: l => ['Trong 3 phát biểu sau về "' + l + '", phát biểu nào SAI?'], game: 't1' },
+  { id: 'box', name: 'Hộp bí mật', from: 'Mystery Box', min: 4, tag: 'Tạo tò mò',
+    how: ['Đặt một đồ vật (hoặc từ khóa) liên quan đến bài vào hộp kín.', 'Học sinh được hỏi tối đa 10 câu, giáo viên chỉ trả lời "Có" hoặc "Không".', 'Đoán đúng thì mở hộp; từ đồ vật dẫn vào bài mới.'],
+    ask: l => ['Trong hộp có một thứ liên quan đến "' + l + '". Các em có 10 câu hỏi Có/Không để đoán.'], game: 'q5' },
+  { id: 'pic', name: 'Bức tranh bí ẩn', from: 'Picture Reveal', min: 5, tag: 'Lật mảnh ghép',
+    how: ['Một bức tranh về chủ đề bài mới bị che bởi các mảnh ghép.', 'Mỗi câu trả lời đúng (câu hỏi bài cũ) lật một mảnh.', 'Đội nào đoán đúng nội dung bức tranh trước thì thắng; bức tranh dẫn vào bài.'],
+    ask: l => ['Bức tranh ẩn sau các mảnh ghép nói về điều gì?'], game: 'q15' },
+  { id: 'storm', name: 'Động não 60 giây', from: 'Brainstorming / Word Storm', min: 3, tag: 'Thi đua theo nhóm',
+    how: ['Nêu một từ khóa của bài mới.', 'Trong 60 giây, mỗi nhóm viết càng nhiều từ liên quan càng tốt.', 'Nhóm đọc danh sách; từ nào nhóm khác cũng có thì gạch. Nhóm còn nhiều từ nhất thắng.'],
+    ask: l => ['Trong 60 giây, viết tất cả những từ em nghĩ đến khi nghe: "' + l + '".'] },
+  { id: 'corners', name: 'Bốn góc', from: 'Four Corners', min: 5, tag: 'Vận động, bày tỏ ý kiến',
+    how: ['Dán 4 lựa chọn ở 4 góc lớp (A–B–C–D, hoặc Rất đồng ý – Đồng ý – Không đồng ý – Rất không đồng ý).', 'Đọc một câu hỏi hay nhận định về chủ đề.', 'Học sinh đi về góc mình chọn, trao đổi 1 phút rồi cử đại diện nêu lí do.'],
+    ask: l => ['Nêu một nhận định về "' + l + '" để học sinh chọn góc: Rất đồng ý – Đồng ý – Không đồng ý – Rất không đồng ý.'] },
+  { id: 'hot', name: 'Ghế nóng', from: 'Hot Seat', min: 5, tag: 'Đoán từ khóa',
+    how: ['Một học sinh ngồi quay lưng lại bảng.', 'Giáo viên viết một từ khóa của bài lên bảng.', 'Cả lớp gợi ý bằng lời (không được nói thẳng từ đó); bạn ngồi ghế nóng đoán trong 1 phút.', 'Đổi người, đổi từ khóa.'],
+    ask: l => ['Từ khóa hôm nay nằm trong bài "' + l + '". Lớp gợi ý, bạn ngồi ghế nóng đoán!'], game: 'w4' },
+  { id: 'donow', name: 'Vé vào lớp', from: 'Do Now / Entry Ticket (Doug Lemov)', min: 3, tag: 'Làm ngay khi vào lớp',
+    how: ['Chiếu sẵn 1–2 câu hỏi ngắn khi học sinh vào lớp.', 'Học sinh tự làm trong 3 phút vào giấy nháp, không hỏi nhau.', 'Gọi ngẫu nhiên 2 em trả lời, giáo viên dẫn vào bài.'],
+    ask: l => ['Vé vào lớp: viết 1 điều em còn nhớ ở bài trước và 1 điều em đoán sẽ học ở "' + l + '".'], game: 'q1' },
+  { id: 'buzz', name: 'Ai nhanh hơn', from: 'Quiz Bowl / Buzzer round', min: 5, tag: 'Thi đua theo đội', how: ['Chia lớp 2–4 đội.', 'Giáo viên đọc câu hỏi, đội bấm chuông nhanh nhất được trả lời.', 'Sai thì đội khác được quyền trả lời.'], ask: l => ['3–5 câu hỏi nhanh ôn bài cũ, dẫn vào "' + l + '".'], game: 'q17' },
+  { id: 'cross', name: 'Ô chữ mở bài', from: 'Crossword', min: 6, tag: 'Tìm từ khóa', how: ['Mỗi hàng ngang là một câu hỏi bài cũ.', 'Giải các hàng ngang để lộ dần từ khóa hàng dọc.', 'Từ khóa chính là chủ đề bài mới.'], ask: l => ['Giải ô chữ để tìm từ khóa của bài hôm nay.'], game: 'w1' },
+  { id: 'odd', name: 'Tìm kẻ lạ', from: 'Odd One Out', min: 3, tag: 'Phân loại, lập luận', how: ['Đưa ra 4 mục, trong đó 3 mục cùng nhóm.', 'Học sinh chỉ ra mục "lạc loài" và giải thích vì sao.', 'Tiêu chí phân loại chính là nội dung dẫn vào bài.'], ask: l => ['Trong 4 mục sau, mục nào khác loại? Vì sao?'], game: 'g3' },
+  { id: 'bingo', name: 'Bingo ôn nhanh', from: 'Bingo', min: 6, tag: 'Cả lớp cùng chơi', how: ['Mỗi học sinh/nhóm có một bảng Bingo các đáp án.', 'Giáo viên đọc câu hỏi, học sinh đánh dấu đáp án trên bảng.', 'Ai đủ một hàng thì hô BINGO.'], ask: l => ['Bingo ôn lại bài cũ trước khi vào "' + l + '".'], game: 'q16' },
+  { id: 'chain', name: 'Truyền điện', from: 'Popcorn / Word Chain', min: 3, tag: 'Phản xạ nhanh', how: ['Một em nêu một từ/ý thuộc chủ đề rồi gọi tên bạn bất kỳ.', 'Bạn được gọi phải nêu ngay một ý khác trong 3 giây, rồi "truyền điện" tiếp.', 'Ai lặp lại ý cũ hoặc quá 3 giây thì ngồi xuống.'], ask: l => ['Truyền điện: mỗi em nêu một từ liên quan đến "' + l + '".'] },
+  { id: 'race', name: 'Đường đua tri thức', from: 'Trò chơi đua theo đội', min: 6, tag: 'Thi đua theo đội', how: ['Chia lớp thành các đội, mỗi đội một xe.', 'Trả lời đúng thì xe tiến lên.', 'Đội về đích trước thắng.'], ask: l => ['Đua xe ôn bài cũ, về đích là vào bài "' + l + '".'], game: 'q2' },
+  { id: 'wheel', name: 'Vòng quay may mắn', from: 'Wheel of Fortune', min: 6, tag: 'May mắn + kiến thức', how: ['Đội trả lời đúng được quay vòng quay để nhận điểm.', 'Có ô mất lượt, ô nhân đôi tạo bất ngờ.', 'Đội nhiều điểm nhất thắng.'], ask: l => ['Vòng quay ôn bài cũ trước khi học "' + l + '".'], game: 'q4' }
+];
+function vWarm() {
+  const v = h('div', { class: 'view' });
+  const W = Object.assign({ subject: (S.quick && S.quick.subject) || mySubjects()[0] || '', grade: (S.quick && S.quick.grade) || '', cls: '', lesson: '', tab: 'new', way: 'wheel' }, LS.get('dh.warm', {}));
+  const keep = () => LS.set('dh.warm', W);
+  const f = (label, ...el) => h('label', { class: 'f' }, h('span', null, label), ...el);
+  const key = () => ppKey(W.subject, W.grade);
+  const lessons = () => { const l = (S.ppct[key()] || []).map(x => x.t); S.lib.filter(p => !p.demo && p.subject === W.subject && String(p.grade) === String(W.grade) && p.lesson).forEach(p => { if (!l.some(t => norm(t) === norm(p.lesson))) l.push(p.lesson); }); return l; };
+  const packOf = lesson => S.lib.find(p => !p.demo && p.subject === W.subject && String(p.grade) === String(W.grade) && norm(p.lesson) === norm(lesson));
+  const classes = () => S.roster ? Object.keys(S.roster.classes).filter(c => !W.grade || c.startsWith(W.grade)).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
+  const body = h('div', { style: { display: 'grid', gap: '18px' } });
+
+  // --- chọn môn, khối, lớp, bài (dùng chung cho cả hai thẻ) ---
+  const lessonSel = h('select', { id: 'w-lesson', onchange: e => { W.lesson = e.target.value === '__c' ? '' : e.target.value; customIn.hidden = e.target.value !== '__c'; keep(); draw(); } });
+  const customIn = h('input', { type: 'text', id: 'w-custom', placeholder: 'Gõ tên bài', hidden: true, oninput: e => { W.lesson = e.target.value; keep(); }, onchange: () => draw() });
+  const clsBox = h('div', { class: 'chips' });
+  const fillLessons = () => { const l = lessons(); if (W.lesson && !l.some(t => t === W.lesson)) { customIn.hidden = false; customIn.value = W.lesson; } lessonSel.innerHTML = ''; lessonSel.append(h('option', { value: '' }, l.length ? '— Bấm để chọn bài (' + l.length + ' bài) —' : '— Chưa có danh sách bài —'), ...l.map(t => h('option', { value: t, selected: W.lesson === t }, t)), h('option', { value: '__c', selected: !!W.lesson && !l.includes(W.lesson) }, '✎ Gõ tên bài khác…')); };
+  const fillCls = () => { clsBox.innerHTML = ''; const cs = classes(); if (W.cls && !cs.includes(W.cls)) W.cls = ''; if (!cs.length) return clsBox.append(h('span', { class: 'small muted' }, S.roster ? 'Chọn khối để hiện lớp.' : 'Chưa có danh sách học sinh – tải ở bảng Dữ liệu dùng chung bên dưới.')); cs.forEach(c => clsBox.append(h('button', { type: 'button', class: 'chip', 'aria-pressed': W.cls === c, onclick: () => { W.cls = c; called.clear(); if (!W.grade) { W.grade = c[0]; gradeSel.value = W.grade; fillLessons(); sh.refresh(); } keep(); fillCls(); draw(); } }, c, h('span', { class: 'small', style: { opacity: .7 } }, ' · ' + S.roster.classes[c].length)))); };
+  const subBox = h('span', { style: { display: 'grid', gap: '6px' } }); subBox.append(...subjectPicker('w-sub', W.subject, val => { W.subject = val; W.lesson = ''; keep(); fillLessons(); sh.refresh(); draw(); }));
+  const gradeSel = h('select', { id: 'w-grade', onchange: e => { W.grade = e.target.value; W.lesson = ''; keep(); fillLessons(); fillCls(); sh.refresh(); draw(); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(W.grade) === g }, 'Khối ' + g)));
+  const sh = sharedPanel(() => ({ subject: W.subject, grade: W.grade }), () => { fillLessons(); fillCls(); draw(); });
+  const tabSeg = h('div', { class: 'seg' }, [['new', 'Khởi động bài mới'], ['old', 'Hỏi bài cũ']].map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': W.tab === k, onclick: () => { W.tab = k; keep(); tabSeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); draw(); } }, t)));
+  v.append(h('h1', null, 'Khởi động'), h('p', { class: 'muted' }, 'Chọn lớp và bài một lần; bên dưới là các ý tưởng mở đầu bài mới và các cách gọi học sinh hỏi bài cũ.'),
+    h('div', { class: 'card', style: { display: 'grid', gap: '12px' } }, h('div', { class: 'g3' }, f('Môn học', subBox), f('Khối', gradeSel), f('Tên bài', lessonSel, customIn)), h('div', { class: 'f' }, h('span', null, 'Lớp'), clsBox),
+      h('details', { class: 'adv' }, h('summary', null, 'Dữ liệu dùng chung (phân phối chương trình, sách, danh sách học sinh)'), h('div', null, sh))),
+    h('div', null, tabSeg), body);
+
+  // --- đồng hồ đếm ngược dùng chung ---
+  const timerBox = start => {
+    let left = start, id = 0; const out = h('div', { class: 'big', style: { fontSize: 'clamp(48px,9vw,96px)', textAlign: 'center' } }, fmtTime(left));
+    const stop = () => { clearInterval(id); id = 0; }, set = s => { stop(); left = s; out.textContent = fmtTime(left); out.style.color = ''; };
+    const run = () => { if (id) return; id = setInterval(() => { if (!out.isConnected) return stop(); left = Math.max(0, left - 1); out.textContent = fmtTime(left); if (left <= 10) out.style.color = 'var(--bad)'; if (!left) { stop(); sfx('win'); } }, 1000); };
+    return h('div', { style: { display: 'grid', gap: '8px', justifyItems: 'center' } }, out, h('div', { class: 'row', style: { justifyContent: 'center' } }, h('button', { class: 'btn primary', onclick: run }, '▶ Bắt đầu'), h('button', { class: 'btn', onclick: stop }, 'Dừng'), [1, 2, 3, 5].map(m => h('button', { class: 'btn small', onclick: () => set(m * 60) }, m + ' phút'))));
+  };
+  const full = el => h('button', { class: 'btn sun', onclick: () => { if (document.fullscreenElement) document.exitFullscreen(); else if (el.requestFullscreen) el.requestFullscreen(); } }, 'Chiếu lên màn hình');
+
+  // --- thẻ 1: ý tưởng khởi động bài mới ---
+  function drawNew() {
+    const lesson = W.lesson || 'bài hôm nay', open = WARM_IDEAS.find(x => x.id === W.idea);
+    if (open) {
+      const pk = W.lesson ? packOf(W.lesson) : null, g = open.game ? gameById(open.game) : null, D = pk ? parsePack(pk) : null, can = !!(g && D && COUNT(D, g.kind) >= g.min);
+      const stage = h('div', { class: 'card warmstage', style: { display: 'grid', gap: '14px' } });
+      stage.append(h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { W.idea = ''; keep(); draw(); } }, '← Các ý tưởng khác'), h('div', { class: 'grow' }), full(stage)),
+        h('div', null, h('span', { class: 'pill plain' }, open.tag + ' · khoảng ' + open.min + ' phút'), h('h2', { style: { marginTop: '6px' } }, open.name), h('div', { class: 'small muted' }, 'Nguồn: ' + open.from + (W.lesson ? ' · Bài: ' + W.lesson : '') + (W.cls ? ' · Lớp ' + W.cls : ''))),
+        h('div', { class: 'warm2' }, h('div', null, h('b', null, 'Cách làm'), h('ol', { class: 'warmol' }, open.how.map(s => h('li', null, s)))),
+          h('div', null, h('b', null, 'Câu dẫn gợi ý cho bài này'), h('ul', { class: 'warmol' }, open.ask(lesson).map(s => h('li', null, s))), timerBox(Math.min(open.min, 5) * 60))),
+        g ? h('div', { class: 'note' + (can ? ' ok' : '') }, can ? ['Ý tưởng này chơi được ngay trên màn hình bằng trò "' + g.name + '" với câu hỏi của bài. ', h('button', { class: 'btn primary', onclick: () => go('play', { game: g.id, pack: pk.id }) }, '▶ Chơi "' + g.name + '"')]
+          : ['Ý tưởng này có trò "' + g.name + '" trong app, nhưng ' + (W.lesson ? 'bài này chưa có câu hỏi phù hợp. ' : 'thầy cô chưa chọn bài. '), W.lesson ? h('button', { class: 'btn primary', onclick: () => { S.quick = Object.assign({}, S.quick, { subject: W.subject, grade: W.grade, lesson: lessons().includes(W.lesson) ? W.lesson : '__custom', custom: W.lesson, games: [g.id], game: g.id }); LS.set('dh.quick', S.quick); go('home'); } }, 'Tạo câu hỏi cho bài này') : null]) : null,
+        h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => copyText('Tôi là giáo viên THCS, dạy môn ' + (W.subject || '…') + ' lớp ' + (W.grade || '…') + ', bài "' + lesson + '". Hãy soạn nội dung cụ thể cho hoạt động khởi động "' + open.name + '" (' + open.from + '), thời lượng ' + open.min + ' phút, đúng kiến thức sách giáo khoa hiện hành, phù hợp học sinh lớp ' + (W.grade || '…') + '. Cách làm: ' + open.how.join(' ') + ' Trình bày: lời dẫn của giáo viên, nội dung chiếu lên màn hình, đáp án và câu chuyển ý vào bài mới.') }, 'Sao chép yêu cầu để nhờ AI soạn nội dung cụ thể'), h('span', { class: 'small muted' }, 'Dán vào Gemini / ChatGPT để có nội dung chi tiết cho đúng bài này.')));
+      return body.append(stage);
+    }
+    body.append(h('div', { class: 'card', style: { display: 'grid', gap: '12px' } }, h('h3', null, 'Chọn một ý tưởng để mở đầu' + (W.lesson ? ' bài "' + W.lesson + '"' : '')),
+      h('p', { class: 'small muted' }, WARM_IDEAS.length + ' hoạt động khởi động quen dùng ở nhiều nước. Thẻ có chữ "Có trò chơi" chạy được ngay trên màn hình với câu hỏi của bài.'),
+      h('div', { class: 'gamegrid' }, WARM_IDEAS.map((x, i) => h('button', { type: 'button', class: 'gcard', onclick: () => { W.idea = x.id; keep(); draw(); window.scrollTo(0, 0); } }, h('span', { class: 'gico c-' + ['q', 'pairs', 'words', 'seq', 'groups', 'tf', 'cloze'][i % 7] }, String(i + 1)), h('span', null, h('b', null, x.name), h('small', null, x.tag + ' · ' + x.min + ' phút' + (x.game ? ' · Có trò chơi' : ''))))))));
+  }
+
+  // --- thẻ 2: hỏi bài cũ – gọi học sinh ngẫu nhiên ---
+  const called = new Set();
+  function drawOld() {
+    const names = W.cls && S.roster && S.roster.classes[W.cls] ? S.roster.classes[W.cls].map(s => s.name) : [];
+    const stage = h('div', { class: 'card warmstage', style: { display: 'grid', gap: '14px' } });
+    if (!names.length) return body.append(h('div', { class: 'card' }, h('div', { class: 'note' }, S.roster ? 'Thầy cô bấm chọn một lớp ở trên để lấy danh sách học sinh.' : 'Chưa có danh sách học sinh. Mở mục "Dữ liệu dùng chung" ở trên để tải danh sách lớp (một lần), rồi quay lại đây.')));
+    let noRep = true; const pool = () => names.filter(n => !noRep || !called.has(n));
+    const who = h('div', { class: 'big warmwho' }, '—'), hist = h('div', { class: 'small muted', style: { textAlign: 'center' } }), play = h('div', { class: 'warmplay' });
+    const upHist = () => { hist.textContent = called.size ? 'Đã gọi (' + called.size + '/' + names.length + '): ' + [...called].join(', ') : 'Lớp ' + W.cls + ': ' + names.length + ' học sinh.'; };
+    const win = n => { who.textContent = n; called.add(n); sfx('win'); upHist(); qBox.hidden = false; showQ(false); };
+    const noPool = () => { toast('Đã gọi hết cả lớp – bấm "Gọi lại từ đầu".'); };
+    // 1) vòng quay
+    const wheel = () => {
+      const P = pool(); if (!P.length) return noPool();
+      const cv = h('canvas', { width: 520, height: 520, style: { width: 'min(100%,440px)', height: 'auto' } }), x = cv.getContext('2d'), N = P.length, col = ['#1877F2', '#42B72A', '#F7B928', '#F0506E', '#8A55C9', '#12A5B5', '#F5821F', '#5462D8'];
+      const paint = rot => { x.clearRect(0, 0, 520, 520); for (let i = 0; i < N; i++) { const a0 = rot + i * 2 * Math.PI / N, a1 = a0 + 2 * Math.PI / N; x.beginPath(); x.moveTo(260, 260); x.arc(260, 260, 250, a0, a1); x.closePath(); x.fillStyle = col[i % col.length]; x.fill(); x.save(); x.translate(260, 260); x.rotate((a0 + a1) / 2); x.fillStyle = '#fff'; x.font = '600 ' + (N > 30 ? 11 : N > 18 ? 13 : 16) + 'px sans-serif'; x.textAlign = 'right'; x.textBaseline = 'middle'; x.fillText(P[i].length > 22 ? P[i].slice(0, 21) + '…' : P[i], 240, 0); x.restore(); } x.beginPath(); x.moveTo(492, 260); x.lineTo(520, 244); x.lineTo(520, 276); x.closePath(); x.fillStyle = '#1C1E21'; x.fill(); x.beginPath(); x.arc(260, 260, 22, 0, 7); x.fillStyle = '#fff'; x.fill(); };
+      const k = Math.floor(Math.random() * N), end = 2 * Math.PI * 6 - (k + 0.5) * 2 * Math.PI / N, t0 = performance.now(), dur = 4200;
+      play.innerHTML = ''; play.append(cv); paint(0);
+      const step = t => { if (!cv.isConnected) return; const u = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - u, 3); paint(end * e); if (u < 1) { if (Math.random() < .3) sfx('tick'); requestAnimationFrame(step); } else win(P[k]); };
+      requestAnimationFrame(step);
+    };
+    // 2) đường đua: 6 bạn ngẫu nhiên cùng đua, bạn về đích trước được hỏi
+    const race = () => {
+      const P = shuffle(pool()).slice(0, 6); if (!P.length) return noPool();
+      const pos = P.map(() => 0), bars = P.map((n, i) => h('div', { class: 'lane' }, h('span', { class: 'lname' }, n), h('div', { class: 'ltrack' }, h('i', { style: { width: '0%' } }))));
+      play.innerHTML = ''; play.append(h('div', { class: 'lanes' }, bars));
+      const id = setInterval(() => { if (!play.isConnected) return clearInterval(id); pos.forEach((_, i) => { pos[i] = Math.min(100, pos[i] + Math.random() * 7); bars[i].querySelector('i').style.width = pos[i] + '%'; }); sfx('tick'); const w = pos.findIndex(p => p >= 100); if (w >= 0) { clearInterval(id); bars[w].classList.add('win'); win(P[w]); } }, 120);
+    };
+    // 3) rút thăm: tên chạy nhanh rồi dừng
+    const draw1 = () => { const P = pool(); if (!P.length) return noPool(); play.innerHTML = ''; let k = 0; const winner = pick(P), id = setInterval(() => { if (!who.isConnected) return clearInterval(id); who.textContent = pick(names); sfx('spin'); if (++k > 26) { clearInterval(id); win(winner); } }, 70); };
+    // 4) chọn nhanh N bạn
+    const many = n => { const P = shuffle(pool()).slice(0, n); if (!P.length) return noPool(); play.innerHTML = ''; play.append(h('div', { class: 'chips', style: { justifyContent: 'center' } }, P.map(x => h('span', { class: 'pill plain', style: { fontSize: '20px', padding: '8px 16px' } }, x)))); P.forEach(x => called.add(x)); who.textContent = P.length + ' bạn được chọn'; sfx('win'); upHist(); qBox.hidden = false; showQ(false); };
+    const WAYS = [['wheel', 'Vòng quay may mắn', wheel], ['race', 'Đường đua', race], ['draw', 'Rút thăm', draw1], ['many', 'Chọn nhanh 3 bạn', () => many(3)]];
+    const waySeg = h('div', { class: 'seg' }, WAYS.map(([k, t]) => h('button', { type: 'button', 'data-k': k, 'aria-pressed': W.way === k, onclick: () => { W.way = k; keep(); waySeg.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); } }, t)));
+    // câu hỏi bài cũ: lấy ngẫu nhiên từ một bài đã có trong thư viện
+    const packs = S.lib.filter(p => !p.demo && parsePack(p).q.length && (!W.subject || p.subject === W.subject) && (!W.grade || String(p.grade) === String(W.grade)));
+    const pSel = h('select', { id: 'w-old', style: { maxWidth: '420px' }, onchange: e => { W.old = e.target.value; keep(); usedQ.clear(); showQ(false); } }, h('option', { value: '' }, packs.length ? '— Chọn bài cũ để lấy câu hỏi (không bắt buộc) —' : '— Chưa có bài nào có câu hỏi trong thư viện —'), packs.map(p => h('option', { value: p.id, selected: W.old === p.id }, p.title || p.lesson)));
+    const qBox = h('div', { class: 'warmq', hidden: true }), usedQ = new Set();
+    function showQ(next) {
+      qBox.innerHTML = ''; const p = getPack(W.old); if (!p) return qBox.append(h('div', { class: 'small muted' }, 'Thầy cô hỏi miệng, hoặc chọn một bài cũ ở trên để app hiện câu hỏi.'));
+      const qs = parsePack(p).q; let rest = qs.filter((_, i) => !usedQ.has(i)); if (!rest.length) { usedQ.clear(); rest = qs; }
+      const q0 = pick(rest); usedQ.add(qs.indexOf(q0)); const ans = h('div');
+      // trong bài, đáp án đúng thường được gõ đầu tiên: đảo vị trí phương án trước khi chiếu
+      const ord = shuffle(q0.opts.map((_, i) => i)), q = Object.assign({}, q0, { opts: ord.map(i => q0.opts[i]), ans: q0.ans.map(a => ord.indexOf(a)).sort((a, b) => a - b) });
+      qBox.append(h('div', { class: 'qtext', style: { textAlign: 'left', fontSize: 'clamp(18px,2.4vw,26px)' } }, q.q), h('div', { class: 'warmopts' }, q.opts.map((o, i) => h('div', null, h('b', null, 'ABCDEFGH'[i] + '. '), o))), ans,
+        h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: () => { ans.innerHTML = ''; ans.append(h('div', { class: 'note ok' }, 'Đáp án: ' + q.ans.map(a => 'ABCDEFGH'[a] + '. ' + q.opts[a]).join('; ') + (q.ex ? ' — ' + q.ex : ''))); } }, 'Xem đáp án'), h('button', { class: 'btn', onclick: () => showQ(true) }, 'Câu hỏi khác')));
+    }
+    upHist();
+    stage.append(h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Hỏi bài cũ – lớp ' + W.cls), full(stage)),
+      h('div', { class: 'row' }, h('span', { class: 'small' }, 'Cách chọn:'), waySeg), h('div', { class: 'row' }, h('span', { class: 'small' }, 'Câu hỏi:'), pSel),
+      play, who,
+      h('div', { class: 'row', style: { justifyContent: 'center' } }, h('button', { class: 'btn primary big', id: 'w-go', onclick: () => { qBox.hidden = true; (WAYS.find(x => x[0] === W.way) || WAYS[0])[2](); } }, 'CHỌN HỌC SINH'),
+        h('label', { class: 'row small' }, h('input', { type: 'checkbox', checked: true, onchange: e => { noRep = e.target.checked; } }), 'Không gọi lại bạn đã gọi'), h('button', { class: 'btn', onclick: () => { called.clear(); who.textContent = '—'; play.innerHTML = ''; qBox.hidden = true; upHist(); } }, 'Gọi lại từ đầu')),
+      hist, qBox);
+    body.append(stage);
+  }
+  function draw() { body.innerHTML = ''; if (W.tab === 'old') drawOld(); else drawNew(); }
+  fillLessons(); fillCls(); draw();
+  return v;
+}
 
 /* ===== In phiếu bài tập giấy từ một bài đã lưu (kèm trang đáp án cho giáo viên) ===== */
 function printPack(p) {
