@@ -2657,7 +2657,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.23-1551';
+const BUILD = '2026.11.23-1554';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -4854,6 +4854,52 @@ const WARM_IDEAS = [
   { id: 'race', name: 'Đường đua tri thức', from: 'Trò chơi đua theo đội', min: 6, tag: 'Thi đua theo đội', how: ['Chia lớp thành các đội, mỗi đội một xe.', 'Trả lời đúng thì xe tiến lên.', 'Đội về đích trước thắng.'], ask: l => ['Đua xe ôn bài cũ, về đích là vào bài "' + l + '".'], game: 'q2' },
   { id: 'wheel', name: 'Vòng quay may mắn', from: 'Wheel of Fortune', min: 6, tag: 'May mắn + kiến thức', how: ['Đội trả lời đúng được quay vòng quay để nhận điểm.', 'Có ô mất lượt, ô nhân đôi tạo bất ngờ.', 'Đội nhiều điểm nhất thắng.'], ask: l => ['Vòng quay ôn bài cũ trước khi học "' + l + '".'], game: 'q4' }
 ];
+/* Các ý tưởng giáo viên của trường gợi ý thêm (23/11/2026), kèm ví dụ môn Tin học */
+WARM_IDEAS.push(
+  { id: 'tpe', name: 'Nghĩ – Băn khoăn – Khám phá', from: 'Think–Puzzle–Explore, Project Zero (Đại học Harvard)', min: 5, tag: 'Kích hoạt kiến thức nền',
+    how: ['NGHĨ: em đã biết gì về chủ đề này?', 'BĂN KHOĂN: em còn băn khoăn, chưa rõ điều gì?', 'KHÁM PHÁ: em muốn tìm hiểu điều gì, bằng cách nào?', 'Giáo viên gom các băn khoăn thành câu hỏi dẫn vào bài.'],
+    ask: l => ['Em đã biết gì về "' + l + '"?', 'Em còn băn khoăn điều gì?', 'Em muốn khám phá điều gì trong bài này?'], eg: 'Trước bài "Thư điện tử" hoặc "An toàn trên Internet".' },
+  { id: 'bait', name: '"Bẫy" quan niệm sai', from: 'Bait and switch (Edutopia)', min: 5, tag: 'Đúng/Sai gây bất ngờ',
+    how: ['Cho học sinh làm nhanh 3–5 câu Đúng/Sai nghe rất hợp lí nhưng thực ra sai.', 'Chưa chữa ngay: đếm số bạn chọn Đúng ở từng câu.', 'Cùng nhau gỡ từng câu trong bài học; học sinh tự bác bỏ quan niệm sai của mình.'],
+    ask: l => ['Những nhận định sau về "' + l + '" đúng hay sai? (Cẩn thận: có "bẫy"!)'], game: 't1', eg: '"Xoá tệp trong Thùng rác là mất vĩnh viễn", "Chế độ ẩn danh thì không ai biết em vào web nào".' },
+  { id: 'pf', name: 'Thất bại có ích', from: 'Productive Failure, Manu Kapur', min: 5, tag: 'Thử giải trước khi học',
+    how: ['Giao một bài toán ngắn về khái niệm trọng tâm TRƯỚC khi giảng.', 'Học sinh tự làm theo cách của mình trong 3–4 phút; làm chưa ra cũng không sao.', 'Mời 2–3 cách làm khác nhau lên bảng, chưa nhận xét đúng sai.', 'Chính lúc bế tắc khiến các em muốn nghe lời giải – giáo viên dẫn vào bài.'],
+    ask: l => ['Các em thử tự giải bài toán sau theo cách của mình (chưa cần đúng), rồi ta cùng học "' + l + '".'], eg: 'Tự viết các bước sắp xếp 5 bạn theo chiều cao, trước bài "Thuật toán sắp xếp".' },
+  { id: 'retr', name: 'Ôn nhanh bằng gợi nhớ', from: 'Retrieval practice / Rapid review', min: 4, tag: 'Thay cho kiểm tra miệng',
+    how: ['Gấp vở lại. Mỗi em tự nhớ lại 1 phút: tiết trước học gì?', 'Trao đổi với bạn bên cạnh 1 phút, bổ sung cho nhau.', 'Gọi ngẫu nhiên 2–3 cặp tóm tắt trước lớp; giáo viên nối sang bài mới.'],
+    ask: l => ['Không mở vở: tiết trước chúng ta đã học những gì?', 'Điều đó liên quan thế nào đến "' + l + '"?'], eg: 'Dùng thẻ "Hỏi bài cũ" bên cạnh để gọi ngẫu nhiên các cặp trình bày.' },
+  { id: 'link', name: 'Vật bí ẩn – Ảnh bí ẩn', from: 'Mystery object / Odd pairing', min: 4, tag: 'Tìm mối liên hệ',
+    how: ['Đưa ra một bức ảnh và một đồ vật (hoặc hai đồ vật) tưởng như không liên quan.', 'Học sinh thảo luận cặp: hai thứ này có mối liên hệ gì?', 'Mối liên hệ chính là chủ đề của bài mới.'],
+    ask: l => ['Hai thứ này có liên quan gì với nhau? Gợi ý: câu trả lời nằm trong bài "' + l + '".'], eg: 'Một chiếc đĩa mềm đặt cạnh một chiếc USB, trước bài "Lưu trữ dữ liệu".' },
+  { id: 'poe', name: 'Dự đoán – Quan sát – Giải thích', from: 'POE: Predict–Observe–Explain', min: 5, tag: 'Thí nghiệm, thao tác mẫu',
+    how: ['DỰ ĐOÁN: học sinh ghi dự đoán kết quả trước khi giáo viên làm.', 'QUAN SÁT: giáo viên thao tác cho cả lớp xem.', 'GIẢI THÍCH: vì sao kết quả lại như vậy? Khác dự đoán ở đâu?'],
+    ask: l => ['Em dự đoán điều gì sẽ xảy ra? Ghi lại trước khi thầy cô làm thử.'], eg: '"Nếu bấm Ctrl+Z 10 lần thì điều gì xảy ra?", "Chương trình Scratch này sẽ vẽ ra hình gì?"' },
+  { id: 'rebus', name: 'Đuổi hình bắt chữ', from: 'Trò chơi chữ quen thuộc ở Việt Nam', min: 4, tag: 'Đoán từ khóa bằng hình',
+    how: ['Chiếu các hình ảnh gợi ý, học sinh ghép thành từ khóa.', 'Mỗi từ khóa là một khái niệm của bài.', 'Từ khóa cuối cùng nên chính là tên bài mới.'],
+    ask: l => ['Nhìn hình, đoán chữ. Từ khóa cuối cùng là tên bài hôm nay!'], game: 'w6', eg: 'Từ khóa hàng dọc / từ khóa cuối nên chính là tên bài mới để dẫn thẳng vào bài.' },
+  { id: 'star', name: 'Ngôi sao may mắn', from: 'Trò chơi quen thuộc ở Việt Nam', min: 5, tag: 'May mắn + kiến thức',
+    how: ['Mỗi ngôi sao (ô cửa) ẩn một câu hỏi bài cũ; có ô may mắn được điểm ngay.', 'Các đội lần lượt chọn sao và trả lời.', 'Đội nhiều điểm nhất thắng.'],
+    ask: l => ['Chọn ngôi sao, trả lời câu hỏi bài cũ để mở đường vào "' + l + '".'], game: 'q5' },
+  { id: 'case', name: 'Tình huống thực tế "có vấn đề"', from: 'Dạy học tình huống', min: 5, tag: 'Liên hệ đời sống',
+    how: ['Kể một câu chuyện có thật, gần gũi với học sinh.', 'Hỏi: "Nếu là em, em sẽ làm gì?"', 'Lấy 2–3 ý kiến khác nhau, chưa kết luận; bài học sẽ trả lời.'],
+    ask: l => ['Nếu là em trong tình huống này, em sẽ làm gì? Vì sao?'], eg: 'Một bạn bị lừa mất tài khoản mạng xã hội – hợp với chủ đề Đạo đức, pháp luật và văn hoá trong môi trường số.' },
+  { id: 'role', name: 'Đóng vai ngắn', from: 'Sân khấu hoá', min: 4, tag: 'Tiểu phẩm 1 phút',
+    how: ['Hai học sinh diễn một tiểu phẩm khoảng 1 phút (chuẩn bị từ trước hoặc theo kịch bản giáo viên phát).', 'Cả lớp quan sát và trả lời: hai bạn đang mô phỏng điều gì?', 'Giáo viên chốt và dẫn vào bài.'],
+    ask: l => ['Xem tiểu phẩm và cho biết: hai bạn đang mô phỏng điều gì trong bài "' + l + '"?'], eg: 'Hai bạn đóng vai "máy khách" và "máy chủ" trước bài "Mạng máy tính".' },
+  { id: 'arena', name: 'Đấu trường 5 câu nhanh', from: 'Kiểu Kahoot / Quizizz / Blooket', min: 5, tag: 'Mỗi em một máy',
+    how: ['Chuẩn bị 5 câu hỏi nhanh về bài cũ hoặc hiểu biết ban đầu về bài mới.', 'Phòng máy: giao bài bằng link, mỗi em tự làm trên máy mình; điểm tự về Bảng điểm.', 'Không đủ máy: chơi chung trên màn hình theo đội.'],
+    ask: l => ['5 câu hỏi nhanh trước khi vào "' + l + '". Sẵn sàng chưa?'], game: 'q1', eg: 'Hợp nhất khi phòng máy đủ thiết bị; dùng nút "Giao bài cho học sinh" ở Trang chủ để lấy link.' },
+  { id: 'aiornot', name: 'AI hay người làm?', from: 'Hoạt động về trí tuệ nhân tạo', min: 5, tag: 'Tranh luận, thời sự',
+    how: ['Chiếu 2–3 bức ảnh hoặc đoạn văn, có cái do AI tạo, có cái do người làm.', 'Học sinh đoán và nêu lí do (dấu hiệu nào khiến em nghĩ vậy?).', 'Công bố đáp án, dẫn vào nội dung về AI hoặc về đánh giá thông tin.'],
+    ask: l => ['Trong các sản phẩm sau, cái nào do AI tạo ra? Dựa vào đâu em nghĩ vậy?'], eg: 'Hợp với nội dung AI trong chương trình Tin học và chủ đề đánh giá thông tin.' }
+);
+/* Ba nhóm ý tưởng và bốn nguyên tắc khởi động (theo gợi ý của giáo viên) */
+const WARM_GROUPS = [
+  ['Nhóm 1 – Kĩ thuật tư duy, đã được nghiên cứu và dùng rộng rãi', ['stw', 'tpe', 'kwl', 'tps', 'bait', 'ttl', 'pf', 'retr', 'link', 'box', 'poe', 'donow', 'corners']],
+  ['Nhóm 2 – Trò chơi và hoạt động quen thuộc ở Việt Nam', ['rebus', 'cross', 'star', 'wheel', 'race', 'pic', 'hot', 'storm', 'chain', 'odd', 'bingo', 'buzz', 'case', 'role']],
+  ['Nhóm 3 – Ứng dụng công nghệ và AI', ['arena', 'aiornot']]
+];
+const WARM_RULES = [['Ngắn', 'khoảng 3–5 phút, không để trò chơi lấn sang thời gian của bài chính.'], ['Gắn với bài', 'khởi động phải dẫn tới câu hỏi trọng tâm của bài học.'], ['Tạo "khoảng trống"', 'học sinh nhận ra mình chưa biết điều gì đó và muốn tìm hiểu.'], ['Thay đổi hình thức', 'mỗi tuần đổi giữa nhóm tư duy, nhóm trò chơi và nhóm công nghệ.']];
 function vWarm() {
   const v = h('div', { class: 'view' });
   const W = Object.assign({ subject: (S.quick && S.quick.subject) || mySubjects()[0] || '', grade: (S.quick && S.quick.grade) || '', cls: '', lesson: '', tab: 'new', way: 'wheel' }, LS.get('dh.warm', {}));
@@ -4898,15 +4944,18 @@ function vWarm() {
       stage.append(h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => { W.idea = ''; keep(); draw(); } }, '← Các ý tưởng khác'), h('div', { class: 'grow' }), full(stage)),
         h('div', null, h('span', { class: 'pill plain' }, open.tag + ' · khoảng ' + open.min + ' phút'), h('h2', { style: { marginTop: '6px' } }, open.name), h('div', { class: 'small muted' }, 'Nguồn: ' + open.from + (W.lesson ? ' · Bài: ' + W.lesson : '') + (W.cls ? ' · Lớp ' + W.cls : ''))),
         h('div', { class: 'warm2' }, h('div', null, h('b', null, 'Cách làm'), h('ol', { class: 'warmol' }, open.how.map(s => h('li', null, s)))),
-          h('div', null, h('b', null, 'Câu dẫn gợi ý cho bài này'), h('ul', { class: 'warmol' }, open.ask(lesson).map(s => h('li', null, s))), timerBox(Math.min(open.min, 5) * 60))),
+          h('div', null, h('b', null, 'Câu dẫn gợi ý cho bài này'), h('ul', { class: 'warmol' }, open.ask(lesson).map(s => h('li', null, s))), open.eg ? h('div', { class: 'small muted', style: { marginBottom: '10px' } }, h('b', null, 'Ví dụ (Tin học): '), open.eg) : null, timerBox(Math.min(open.min, 5) * 60))),
         g ? h('div', { class: 'note' + (can ? ' ok' : '') }, can ? ['Ý tưởng này chơi được ngay trên màn hình bằng trò "' + g.name + '" với câu hỏi của bài. ', h('button', { class: 'btn primary', onclick: () => go('play', { game: g.id, pack: pk.id }) }, '▶ Chơi "' + g.name + '"')]
           : ['Ý tưởng này có trò "' + g.name + '" trong app, nhưng ' + (W.lesson ? 'bài này chưa có câu hỏi phù hợp. ' : 'thầy cô chưa chọn bài. '), W.lesson ? h('button', { class: 'btn primary', onclick: () => { S.quick = Object.assign({}, S.quick, { subject: W.subject, grade: W.grade, lesson: lessons().includes(W.lesson) ? W.lesson : '__custom', custom: W.lesson, games: [g.id], game: g.id }); LS.set('dh.quick', S.quick); go('home'); } }, 'Tạo câu hỏi cho bài này') : null]) : null,
         h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => copyText('Tôi là giáo viên THCS, dạy môn ' + (W.subject || '…') + ' lớp ' + (W.grade || '…') + ', bài "' + lesson + '". Hãy soạn nội dung cụ thể cho hoạt động khởi động "' + open.name + '" (' + open.from + '), thời lượng ' + open.min + ' phút, đúng kiến thức sách giáo khoa hiện hành, phù hợp học sinh lớp ' + (W.grade || '…') + '. Cách làm: ' + open.how.join(' ') + ' Trình bày: lời dẫn của giáo viên, nội dung chiếu lên màn hình, đáp án và câu chuyển ý vào bài mới.') }, 'Sao chép yêu cầu để nhờ AI soạn nội dung cụ thể'), h('span', { class: 'small muted' }, 'Dán vào Gemini / ChatGPT để có nội dung chi tiết cho đúng bài này.')));
       return body.append(stage);
     }
-    body.append(h('div', { class: 'card', style: { display: 'grid', gap: '12px' } }, h('h3', null, 'Chọn một ý tưởng để mở đầu' + (W.lesson ? ' bài "' + W.lesson + '"' : '')),
-      h('p', { class: 'small muted' }, WARM_IDEAS.length + ' hoạt động khởi động quen dùng ở nhiều nước. Thẻ có chữ "Có trò chơi" chạy được ngay trên màn hình với câu hỏi của bài.'),
-      h('div', { class: 'gamegrid' }, WARM_IDEAS.map((x, i) => h('button', { type: 'button', class: 'gcard', onclick: () => { W.idea = x.id; keep(); draw(); window.scrollTo(0, 0); } }, h('span', { class: 'gico c-' + ['q', 'pairs', 'words', 'seq', 'groups', 'tf', 'cloze'][i % 7] }, String(i + 1)), h('span', null, h('b', null, x.name), h('small', null, x.tag + ' · ' + x.min + ' phút' + (x.game ? ' · Có trò chơi' : ''))))))));
+    let no = 0;
+    body.append(h('div', { class: 'card', style: { display: 'grid', gap: '14px' } }, h('h3', null, 'Chọn một ý tưởng để mở đầu' + (W.lesson ? ' bài "' + W.lesson + '"' : '')),
+      h('div', { class: 'note' }, h('b', null, '4 nguyên tắc để khởi động hiệu quả: '), WARM_RULES.map(([a, b], i) => h('div', null, (i + 1) + '. ', h('b', null, a + ': '), b))),
+      h('p', { class: 'small muted' }, WARM_IDEAS.length + ' hoạt động khởi động, chia 3 nhóm. Thẻ có chữ "Có trò chơi" chạy được ngay trên màn hình với câu hỏi của bài.'),
+      WARM_GROUPS.map(([title, ids], gi) => h('div', { style: { display: 'grid', gap: '10px' } }, h('b', null, title),
+        h('div', { class: 'gamegrid' }, ids.map(id => WARM_IDEAS.find(x => x.id === id)).filter(Boolean).map(x => h('button', { type: 'button', class: 'gcard', onclick: () => { W.idea = x.id; keep(); draw(); window.scrollTo(0, 0); } }, h('span', { class: 'gico c-' + ['q', 'pairs', 'groups'][gi] }, String(++no)), h('span', null, h('b', null, x.name), h('small', null, x.tag + ' · ' + x.min + ' phút' + (x.game ? ' · Có trò chơi' : ''))))))))));
   }
 
   // --- thẻ 2: hỏi bài cũ – gọi học sinh ngẫu nhiên ---
