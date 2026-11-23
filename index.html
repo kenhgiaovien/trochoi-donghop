@@ -307,6 +307,11 @@ table.t th{background:color-mix(in srgb,var(--accent) 9%,var(--card));color:var(
 /* Bảng dữ liệu dùng chung */
 .shpanel{display:grid;gap:8px;border:1px solid var(--line);border-radius:14px;padding:14px;background:color-mix(in srgb,var(--accent) 3%,var(--card));min-width:0}
 .shhead{display:grid;gap:2px;margin-bottom:2px}
+.shpick{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.shpick .shsub{max-width:240px}
+.chip.shg.full{border-color:var(--ok)}
+.chip.shg.some{border-color:var(--sun)}
+.chip.shg .small{opacity:.85}
 .shrow{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--ok);border-radius:10px;padding:9px 12px;min-width:0;flex-wrap:wrap}
 .shrow.miss{border-left-color:var(--sun);background:color-mix(in srgb,var(--sun) 7%,var(--card))}
 .shico{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;background:var(--ok)}
@@ -1057,7 +1062,7 @@ function vEditor(id) {
   let shEd = null;
   drawLessonPick(false);
   // Bảng dữ liệu dùng chung của môn + khối đang soạn (cùng một kho với Trang chủ)
-  shEd = sharedPanel(() => ({ subject: p.subject, grade: p.grade }), what => { if (what === 'ppct') drawLessonPick(true); else if (what === 'roster') drawClasses(); });
+  shEd = sharedPanel(() => ({ subject: p.subject, grade: p.grade }), (what, at) => { if (what === 'ppct') drawLessonPick(!!at && at.subject === p.subject && String(at.grade) === String(p.grade)); else if (what === 'roster') drawClasses(); });
   // lớp tự lọc theo khối
   const classBox = h('div', { class: 'chips' });
   const drawClasses = () => {
@@ -2657,7 +2662,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.23-1554';
+const BUILD = '2026.11.23-1559';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -2943,7 +2948,7 @@ function vHome() {
   };
   const openLessons = () => { if (!list.length) return; try { lessonSel.focus({ preventScroll: true }); if (lessonSel.showPicker) lessonSel.showPicker(); } catch (e) { } };
   // Một bảng duy nhất cho mọi dữ liệu dùng chung của môn + khối đang chọn (thay cho các ô tải lên rời rạc trước đây)
-  const shBox = sharedPanel(() => ({ subject: Q.subject, grade: Q.grade }), what => { fillLessons(); fillClasses(); fillMat(); if (what === 'ppct') openLessons(); });
+  const shBox = sharedPanel(() => ({ subject: Q.subject, grade: Q.grade }), (what, at) => { fillLessons(); fillClasses(); fillMat(); if (what === 'ppct' && at && at.subject === Q.subject && String(at.grade) === String(Q.grade)) openLessons(); });
   const onSG = byUser => { if (byUser === 'grade') autoSubject(); Q.lesson = ''; Q.period = 'Toàn bài'; saveQ(); fillLessons(); fillClasses(); fillMat(); shBox.refresh(); if (byUser) openLessons(); };
   const subBox = h('span', { style: { display: 'grid', gap: '6px' } }); subBox.append(...subjectPicker('q-sub', Q.subject, val => { Q.subject = val; onSG('subject'); }));
   const gradeSel = h('select', { id: 'q-grade', onchange: e => { Q.grade = e.target.value; Q.classes = []; onSG('grade'); } }, h('option', { value: '' }, '— Chọn khối —'), ['6', '7', '8', '9'].map(g => h('option', { value: g, selected: String(Q.grade) === g }, 'Khối ' + g)));
@@ -3175,18 +3180,32 @@ if (IS_WEB) { setTimeout(checkUpdate, 4000); setInterval(checkUpdate, 10 * 60 * 
 const SH_DOCS = [['Sách giáo khoa', 'Sách giáo khoa', 'App lấy đúng nội dung của bài để AI soạn câu hỏi.'], ['Kế hoạch bài dạy', 'Kế hoạch bài dạy', 'Câu hỏi bám theo mục tiêu, hoạt động của giáo án.'], ['Tài liệu tham khảo', 'Tài liệu tham khảo', 'Đề cương, bài tập, tài liệu khác của môn này.']];
 function sharedPanel(getSG, onChange) {
   const box = h('div', { class: 'shpanel' }), msg = h('div', { class: 'small', role: 'status' });
-  const changed = what => { try { onChange && onChange(what); } catch (e) { } };
+  const changed = what => { try { onChange && onChange(what, { subject: cur.subject, grade: cur.grade }); } catch (e) { } };
   const picker = (accept, multiple, fn) => { const i = h('input', { type: 'file', accept, multiple, hidden: true, onchange: async e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) await fn(fs); } }); return i; };
   const say = (t, bad) => { msg.className = bad ? 'ferr' : 'small'; msg.textContent = t; };
   const row = (ok, title, detail, ...btns) => h('div', { class: 'shrow ' + (ok ? 'ok' : 'miss') }, h('span', { class: 'shico', 'aria-hidden': 'true' }, ok ? '✓' : '!'),
     h('div', { class: 'grow' }, h('b', null, title), h('div', { class: 'small' }, detail)), h('div', { class: 'row shbtn' }, btns));
-  async function draw() {
-    const sg = getSG() || {}, subject = String(sg.subject || '').trim(), grade = String(sg.grade || '');
+  // Bảng có ô chọn môn và khối RIÊNG: tải xong khối này, bấm sang khối khác tải tiếp, không phụ thuộc bài đang soạn
+  const cur = { subject: '', grade: '' }; let follow = '', seq = 0;
+  async function draw(keepOwn) {
+    const sg = getSG() || {}, pageKey = String(sg.subject || '').trim() + '|' + String(sg.grade || '');
+    // trang đổi môn/khối thì bảng đi theo; còn lại bảng giữ lựa chọn riêng của nó
+    if (!keepOwn && pageKey !== follow) { if (String(sg.subject || '').trim()) cur.subject = String(sg.subject).trim(); if (sg.grade) cur.grade = String(sg.grade); follow = pageKey; }
+    if (!cur.subject) cur.subject = mySubjects()[0] || '';
+    const subject = cur.subject, grade = cur.grade;
+    const my = ++seq; let all = []; try { all = await matAll(); } catch (e) { }
+    if (my !== seq) return;   // có lượt vẽ mới hơn đang chạy: bỏ lượt này, tránh vẽ chồng
     box.innerHTML = '';
-    box.append(h('div', { class: 'shhead' }, h('b', null, 'Dữ liệu dùng chung'), h('span', { class: 'small muted' }, 'Tải lên một lần, app tự dùng cho mọi việc: chọn bài, soạn câu hỏi, giao bài, bảng điểm.')));
-    if (!subject || !grade) { box.append(h('div', { class: 'small muted' }, 'Thầy cô chọn môn và khối, app sẽ kiểm tra dữ liệu nào đã có, dữ liệu nào còn thiếu.')); return; }
+    box.append(h('div', { class: 'shhead' }, h('b', null, 'Dữ liệu dùng chung'), h('span', { class: 'small muted' }, 'Tải lên một lần, app tự dùng cho mọi việc: chọn bài, soạn câu hỏi, giao bài, bảng điểm. Mỗi môn, mỗi khối một bộ: tải xong khối này thì bấm sang khối khác để tải tiếp.')));
+    // chọn môn + khối cho bảng; mỗi khối ghi sẵn đã có mấy mục
+    const subs = [...new Set(mySubjects().concat(Object.keys(S.ppct).map(x => x.slice(0, x.lastIndexOf('|'))), all.map(m => m.subject), subject).filter(Boolean))];
+    const subSel = h('select', { class: 'shsub', 'aria-label': 'Môn của dữ liệu dùng chung', onchange: e => { cur.subject = e.target.value; draw(true); } }, h('option', { value: '' }, '— Chọn môn —'), subs.map(s => h('option', { value: s, selected: s === subject }, s)), SUBJECTS.filter(s => !subs.includes(s)).map(s => h('option', { value: s }, s)));
+    const have = g => { if (!subject) return 0; const ms = all.filter(m => m.subject === subject && String(m.grade) === g); return ((S.ppct[ppKey(subject, g)] || []).length ? 1 : 0) + (ms.some(m => m.kind === SH_DOCS[0][0]) ? 1 : 0) + (ms.some(m => m.kind === SH_DOCS[1][0]) ? 1 : 0) + (ms.some(m => m.kind !== SH_DOCS[0][0] && m.kind !== SH_DOCS[1][0]) ? 1 : 0) + (S.roster && Object.keys(S.roster.classes).some(c => c.startsWith(g)) ? 1 : 0); };
+    box.append(h('div', { class: 'shpick' }, subSel, h('div', { class: 'chips' }, ['6', '7', '8', '9'].map(g => { const n = have(g); return h('button', { type: 'button', class: 'chip shg' + (n === 5 ? ' full' : n ? ' some' : ''), 'aria-pressed': grade === g, onclick: () => { cur.grade = g; draw(true); } }, 'Khối ' + g, h('span', { class: 'small' }, ' · ' + (subject ? n + '/5' : '–'))); }))));
+    if (!subject || !grade) { box.append(h('div', { class: 'small muted' }, 'Thầy cô chọn môn và bấm một khối ở trên: app sẽ cho biết khối đó đã có những dữ liệu nào, còn thiếu gì.')); return; }
+    box.append(h('div', { class: 'small' }, 'Đang xem: ', h('b', null, subject + ' – khối ' + grade), '. Các tệp tải lên bên dưới sẽ lưu cho đúng môn và khối này.'));
     const k = ppKey(subject, grade), pp = S.ppct[k] || [];
-    let mats = []; try { mats = (await matAll()).filter(m => m.subject === subject && String(m.grade) === String(grade)); } catch (e) { }
+    const mats = all.filter(m => m.subject === subject && String(m.grade) === String(grade));
     // 1) Phân phối chương trình
     const ppIn = picker('.xlsx,.xls,.csv,.docx,.pdf,.pptx,.txt', false, async fs => {
       say('Đang đọc ' + fs[0].name + '…');
