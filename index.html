@@ -876,7 +876,7 @@ const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 const gemCfg = () => LS.get('dh.gemini', { key: '', model: '' });
 function aiProvider() { if (S.cloud.sample) return 'claude'; if (IS_WEB && gemCfg().key) return 'gemini'; return null; }
 // Cổng AI chung của trường (Cloudflare Worker giữ khóa Gemini; địa chỉ cổng không phải bí mật)
-const SCHOOL_AI = '';
+const SCHOOL_AI = 'https://cong-ai-donghop.kgv-deploy.workers.dev';
 const schoolAI = () => String(LS.get('dh.schoolAI', '') || SCHOOL_AI).replace(/\/+$/, '');
 function devId() { let d = LS.get('dh.dev', ''); if (!/^[a-z0-9]{8,40}$/.test(d)) { d = (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 24); LS.set('dh.dev', d); } return d; }
 async function gemFetch(path, body, key) {
@@ -2719,7 +2719,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.26-0848';
+const BUILD = '2026.11.26-0910';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));

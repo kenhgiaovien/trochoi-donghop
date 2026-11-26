@@ -1,1 +1,1 @@
-{"v":"2026.11.26-0848","notes":["Chuẩn bị Cổng AI chung của trường: khi trường bật cổng, giáo viên bấm \"Tạo câu hỏi bằng AI\" là có câu hỏi, không cần tạo khóa, không cần sao chép – dán.","Khi cổng hết lượt trong ngày, app tự chuyển sang cách sao chép – dán như cũ."]}
+{"v":"2026.11.26-0910","notes":["Đã bật Cổng AI chung của trường: thầy cô bấm \"Tạo câu hỏi bằng AI\" là app tự soạn câu hỏi, không cần tạo khóa, không cần sao chép – dán.","Mỗi máy dùng tối đa 40 lượt AI mỗi ngày. Khi cổng hết lượt, app tự chuyển sang cách sao chép – dán như cũ."]}
