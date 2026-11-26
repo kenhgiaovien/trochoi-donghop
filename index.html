@@ -943,8 +943,10 @@ function render() {
   else nav.append(h('button', { type: 'button', 'aria-current': 'page' }, 'Học sinh tham gia'));
   const lb = $('#logoBox'); lb.innerHTML = ''; lb.append(h('img', { src: S.logo || DEFAULT_LOGO, alt: 'Logo trường' }));
   const m = $('#main'); m.innerHTML = '';
-  const V = { home: vHome, library: vLibrary, editor: vEditor, hub: vHub, roster: vRoster, scores: vScores, help: vHelp, join: vJoin, play: vPlay, peer: vPeer, warm: vWarm }[S.view] || vHome;
-  m.append(V(S.arg));
+  // Trang nào gặp lỗi thì báo rõ, không để màn hình trắng
+  const safe = fn => function () { try { return fn.apply(this, arguments); } catch (e) { console.error(e); return h('div', { class: 'view' }, h('div', { class: 'note bad' }, h('b', null, 'Trang này vừa gặp lỗi khi mở. '), 'Thầy cô bấm "Tải lại app"; nếu vẫn lỗi, chụp màn hình này gửi người hỗ trợ.', h('div', { class: 'small muted', style: { marginTop: '6px' } }, 'Chi tiết: ' + String((e && e.message) || e).slice(0, 200)), h('div', { style: { marginTop: '8px' } }, h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Tải lại app')))); } };
+  const V0 = { home: vHome, library: vLibrary, editor: vEditor, hub: vHub, roster: vRoster, scores: vScores, help: vHelp, join: vJoin, play: vPlay, peer: vPeer, warm: vWarm }[S.view] || vHome;
+  m.append(safe(V0)(S.arg));
 }
 
 /* ===== Trang chủ ===== */
@@ -1556,9 +1558,10 @@ function rosterFromRows(rows) {
 }
 function vRoster() {
   const v = h('div', { class: 'view' });
-  const R = S.roster;
+  // danh sách rỗng (đã xóa hết lớp) coi như chưa có, tránh trang trắng
+  const R = S.roster && Object.keys(S.roster.classes || {}).length ? S.roster : null;
   const msg = h('div');
-  const fileIn = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.txt', multiple: true, hidden: true, onchange: async e => { const all = {}; let bad = 0; for (const f of e.target.files) { try { const r = await rosterFromFile(f); Object.keys(r).forEach(k => all[k] = (all[k] || []).concat(r[k])); } catch (err) { bad++; } } e.target.value = ''; if (bad) toast('Có ' + bad + ' tệp không đọc được'); modeReplace = true; importAdd(all); modeReplace = false; } });
+  const fileIn = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.txt,.docx,.pdf,.pptx', multiple: true, hidden: true, onchange: async e => { const all = {}; let bad = 0; for (const f of e.target.files) { try { const r = await rosterFromFile(f); Object.keys(r).forEach(k => all[k] = (all[k] || []).concat(r[k])); } catch (err) { bad++; } } e.target.value = ''; if (bad) toast('Có ' + bad + ' tệp không đọc được'); modeReplace = true; importAdd(all); modeReplace = false; } });
   const pasteTa = h('textarea', { id: 'rosterpaste', placeholder: 'Dán từ Excel: mỗi dòng "Lớp [Tab] Họ và tên" hoặc "Lớp, Mã, Họ và tên"', style: { minHeight: '110px' } });
   let modeReplace = false;
   function importText(text) {
@@ -1582,7 +1585,11 @@ function vRoster() {
     saveRoster(); toast(`Đã nhập ${cls.length} lớp`); render();
   }
   v.append(h('div', { class: 'row' }, h('h1', { class: 'grow' }, 'Lớp học'),
-    h('button', { class: 'btn primary', onclick: () => fileIn.click() }, 'Tải danh sách học sinh (Excel)'), fileIn),
+    h('button', { class: 'btn primary big', onclick: () => fileIn.click() }, 'Tải danh sách lớp lên'), fileIn),
+    h('div', { class: 'card', style: { display: 'grid', gap: '6px' } }, h('b', null, 'Tải danh sách lớp lên – nhận nhiều loại tệp'),
+      h('div', { class: 'small' }, 'Excel (.xlsx, .xls), CSV, Word (.docx), PDF có chữ, PowerPoint (.pptx), văn bản (.txt). Chọn được nhiều tệp một lúc.'),
+      h('div', { class: 'small muted' }, 'Một tệp có nhiều lớp, nhiều khối: app tự xếp học sinh vào đúng lớp, giữ đúng thứ tự trong tệp. Excel/CSV cần cột Lớp và cột Họ và tên (hoặc mỗi lớp một trang tính tên là tên lớp). Word/PDF: mỗi lớp có dòng "Lớp 8A" phía trên, hoặc mã lớp nằm trong tên tệp. Ảnh chụp và PDF dạng ảnh scan thì chưa đọc được.'),
+      h('div', null, h('button', { class: 'btn', onclick: () => fileIn.click() }, 'Chọn tệp…'))),
     h('p', { class: 'note' }, 'Danh sách học sinh chỉ lưu trong trình duyệt và tài khoản của thầy cô, KHÔNG nằm trong mã nguồn app. Khi giao bài, thầy cô chọn lớp nào thì chỉ họ tên lớp đó đi kèm đường link.'),
     h('div', { class: 'card', style: { display: 'grid', gap: '8px' } }, h('h3', null, 'Cách khác: dán từ Excel'), pasteTa, h('div', null, h('button', { class: 'btn', onclick: () => importText(pasteTa.value) }, 'Nhập danh sách đã dán')), msg));
   if (!R) { v.append(h('p', { class: 'muted' }, 'Chưa có danh sách. Thầy cô dùng tệp DANH_SACH_HS_DE_NHAP_VAO_APP.csv đã được chuẩn bị sẵn trên máy (32 lớp, 1.274 học sinh).')); return v; }
@@ -1827,7 +1834,7 @@ function rosterFromGrid(rows, dfCls) {
   const out = {};
   if (hi < 0) { if (!dfCls) return rosterFromRows(rows); ni = rows[0] && rows[0].length > 1 && /^\d+$/.test(rows[0][0]) ? 1 : 0; }
   rows.slice(hi + 1).forEach(r => {
-    const name = String(ni >= 0 ? (r[ni] || '') : ((r[ho] || '') + ' ' + (r[ten] || ''))).replace(/\s+/g, ' ').trim();
+    const name = String(ni >= 0 ? (r[ni] || '') : ((r[ho] || '') + ' ' + (r[ten] || ''))).replace(/\s+/g, ' ').trim().replace(/^\d{1,3}\s*[.)\-]\s*/, '');
     const cls = String((ci >= 0 && r[ci]) || dfCls || '').toUpperCase().replace(/\s/g, '');
     if (!name || !cls || /^\d+$/.test(name) || name.length < 3) return;
     (out[cls] = out[cls] || []).push({ id: ii >= 0 && r[ii] ? r[ii] : '', name });
@@ -1835,8 +1842,29 @@ function rosterFromGrid(rows, dfCls) {
   Object.entries(out).forEach(([c, l]) => l.forEach((s, i) => { if (!s.id) s.id = 'DH-' + c + '-' + String(i + 1).padStart(3, '0'); }));
   return out;
 }
+/* Danh s\u00E1ch h\u1ECDc sinh t\u1EEB v\u0103n b\u1EA3n (Word, PDF, PowerPoint, .txt kh\u00F4ng chia c\u1ED9t): nh\u1EADn d\u00F2ng "L\u1EDBp 8A" l\u00E0m t\u00EAn l\u1EDBp cho c\u00E1c d\u00F2ng sau,
+   ho\u1EB7c m\u00E3 l\u1EDBp n\u1EB1m ngay trong d\u00F2ng; h\u1ECD t\u00EAn l\u00E0 c\u1EE5m 2\u20136 t\u1EEB vi\u1EBFt hoa ch\u1EEF \u0111\u1EA7u (ho\u1EB7c vi\u1EBFt hoa c\u1EA3). Gi\u1EEF \u0111\u00FAng th\u1EE9 t\u1EF1 trong t\u1EC7p. */
+function rosterFromText(text, dfCls) {
+  const W = '(?:[A-Z\u00C0-\u1EF8][a-z\u00E0-\u1EF9]+|[A-Z\u00C0-\u1EF8]{2,})', nameRe = new RegExp(W + '(?:\\s+' + W + '){1,5}', 'u');
+  const skip = /danh\s*s[\u00E1a]ch|tr[\u01B0u][\u1EDDo]ng|n[\u0103a]m\s*h[\u1ECDo]c|gi[\u00E1a]o\s*vi[\u00EAe]n|ch[\u1EE7u]\s*nhi[\u1EC7e]m|h[\u1ECDo]\s*v[\u00E0a]\s*t[\u00EAe]n|c[\u1ED9o]ng\s*h[\u00F2o]a|\u0111[\u1ED9o]c\s*l[\u1EADa]p|ph[\u00F2o]ng\s*gd|s[\u1EDFo]\s*gd|hi[\u1EC7e]u\s*tr[\u01B0u][\u1EDFo]ng|ng[\u00E0a]y\s*sinh|ghi\s*ch[\u00FAu]|t[\u1ED5o]ng\s*s[\u1ED1o]/i;
+  const title = s => s.split(/\s+/).map(w => w === w.toUpperCase() ? w[0] + w.slice(1).toLowerCase() : w).join(' ');
+  const out = {}; let cur = dfCls || '';
+  String(text || '').split(/\n/).forEach(raw => {
+    const line = raw.replace(/\[Trang \d+\]/g, ' ').replace(/\s+/g, ' ').trim(); if (!line) return;
+    const head = line.match(/l[\u1EDBo]p\s*:?\s*([6-9]\s?[A-Za-z]{1,2}\d{0,2})(?![0-9A-Za-z])/i);
+    if (head && (skip.test(line) || line.length < 40)) { cur = head[1].replace(/\s/g, '').toUpperCase(); if (!nameRe.test(line.replace(head[0], ''))) return; }
+    if (skip.test(line)) return;
+    const inl = line.match(/(?:^|[^0-9A-Za-z\u00C0-\u1EF9])([6-9][A-Z]{1,2}\d{0,2})(?![0-9A-Za-z\u00C0-\u1EF9])/), cls = inl ? inl[1] : cur;
+    const m = line.replace(/^\s*\d{1,3}\s*[.)\-]?\s+/, '').replace(inl ? inl[1] : '\u0000', ' ').match(nameRe);
+    if (!m || !cls) return;
+    (out[cls] = out[cls] || []).push({ id: '', name: title(m[0]) });
+  });
+  Object.entries(out).forEach(([c, l]) => l.forEach((s, i) => { s.id = 'DH-' + c + '-' + String(i + 1).padStart(3, '0'); }));
+  return out;
+}
 async function rosterFromFile(file) {
-  if (/\.(csv|txt)$/i.test(file.name)) return rosterFromGrid(parseCSV((await readFileText(file)).replace(/^\uFEFF/, '')), guessClass(file.name));
+  if (/\.(docx|pdf|pptx|md)$/i.test(file.name)) return rosterFromText(await extractText(file), guessClass(file.name));
+  if (/\.(csv|txt)$/i.test(file.name)) { const raw = (await readFileText(file)).replace(/^\uFEFF/, ''); let r = {}; try { r = rosterFromGrid(parseCSV(raw), guessClass(file.name)); } catch (e) { } return Object.keys(r).length ? r : rosterFromText(raw, guessClass(file.name)); }
   const XLSX = await loadLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
   const wb = XLSX.read(await readFileBuf(file), { type: 'array' }); const out = {};
   wb.SheetNames.forEach(sn => {
@@ -2662,7 +2690,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.23-1559';
+const BUILD = '2026.11.23-1627';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
@@ -3233,14 +3261,14 @@ function sharedPanel(getSG, onChange) {
     // 3) Danh sách học sinh của khối
     const cls = S.roster ? Object.keys(S.roster.classes).filter(c => c.startsWith(grade)).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
     const nStu = cls.reduce((a, c) => a + S.roster.classes[c].length, 0);
-    const rosIn = picker('.xlsx,.xls,.csv,.txt', true, async fs => {
+    const rosIn = picker('.xlsx,.xls,.csv,.txt,.docx,.pdf,.pptx', true, async fs => {
       let n = 0, bad = 0;
-      for (const f of fs) { say('Đang đọc ' + f.name + '…'); try { const r = await rosterFromFile(f); S.roster = S.roster || { classes: {}, year: '2026-2027', history: [] }; Object.keys(r).forEach(c => { if (r[c] && r[c].length) { S.roster.classes[c] = r[c]; n++; } }); } catch (e) { bad++; } }
+      for (const f of fs) { say('Đang đọc ' + f.name + '…'); try { const r = await rosterFromFile(f); Object.keys(r).forEach(c => { if (r[c] && r[c].length) { S.roster = S.roster || { classes: {}, year: '2026-2027', history: [] }; S.roster.classes[c] = r[c]; n++; } }); } catch (e) { bad++; } }
       if (n) saveRoster();
       const allC = S.roster ? Object.keys(S.roster.classes).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true })) : [];
-      say(n ? 'Đã nhận ' + n + ' lớp từ tệp, học sinh xếp đúng lớp và đúng thứ tự trong tệp. Hiện có: ' + ['6', '7', '8', '9'].map(g => { const l = allC.filter(c => c.startsWith(g)); return l.length ? 'khối ' + g + ' – ' + l.join(', ') : ''; }).filter(Boolean).join('; ') + '.' + (bad ? ' Có ' + bad + ' tệp không đọc được.' : '') : 'Chưa đọc được danh sách lớp trong tệp. Tệp Excel cần có cột Lớp và cột Họ và tên.', !n); changed('roster'); draw();
+      say(n ? 'Đã nhận ' + n + ' lớp từ tệp, học sinh xếp đúng lớp và đúng thứ tự trong tệp. Hiện có: ' + ['6', '7', '8', '9'].map(g => { const l = allC.filter(c => c.startsWith(g)); return l.length ? 'khối ' + g + ' – ' + l.join(', ') : ''; }).filter(Boolean).join('; ') + '.' + (bad ? ' Có ' + bad + ' tệp không đọc được.' : '') : 'Chưa đọc được danh sách lớp trong tệp. Excel cần cột Lớp và cột Họ và tên; Word/PDF cần dòng "Lớp 8A" phía trên danh sách.', !n); changed('roster'); draw();
     });
-    box.append(row(cls.length > 0, 'Danh sách học sinh khối ' + grade, cls.length ? cls.length + ' lớp, ' + nStu + ' học sinh: ' + cls.join(', ') + '.' : 'Chưa có – tải một tệp Excel có cột Lớp và cột Họ và tên (một tệp chứa nhiều lớp, nhiều khối cũng được): app tự xếp học sinh vào đúng lớp, giữ đúng thứ tự.',
+    box.append(row(cls.length > 0, 'Danh sách học sinh khối ' + grade, cls.length ? cls.length + ' lớp, ' + nStu + ' học sinh: ' + cls.join(', ') + '.' : 'Chưa có – tải tệp Excel, CSV, Word hoặc PDF có chữ (một tệp chứa nhiều lớp, nhiều khối cũng được): app tự xếp học sinh vào đúng lớp, giữ đúng thứ tự.',
       h('button', { class: 'btn small' + (cls.length ? '' : ' primary'), type: 'button', onclick: () => rosIn.click() }, cls.length ? 'Tải thêm / thay' : 'Tải lên'), rosIn,
       h('button', { class: 'btn ghost small', type: 'button', onclick: () => go('roster') }, 'Xem / sửa')));
     box.append(msg);
