@@ -875,14 +875,20 @@ async function extractText(file) {
 const GEM = 'https://generativelanguage.googleapis.com/v1beta';
 const gemCfg = () => LS.get('dh.gemini', { key: '', model: '' });
 function aiProvider() { if (S.cloud.sample) return 'claude'; if (IS_WEB && gemCfg().key) return 'gemini'; return null; }
+// Cổng AI chung của trường (Cloudflare Worker giữ khóa Gemini; địa chỉ cổng không phải bí mật)
+const SCHOOL_AI = '';
+const schoolAI = () => String(LS.get('dh.schoolAI', '') || SCHOOL_AI).replace(/\/+$/, '');
+function devId() { let d = LS.get('dh.dev', ''); if (!/^[a-z0-9]{8,40}$/.test(d)) { d = (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 24); LS.set('dh.dev', d); } return d; }
 async function gemFetch(path, body, key) {
+  const school = key === '__school';
   let r;
-  try { r = await fetch(GEM + path, { method: body ? 'POST' : 'GET', headers: Object.assign({ 'x-goog-api-key': key || gemCfg().key }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined }); }
-  catch (e) { throw { code: 'network', message: 'Không kết nối được tới Gemini (kiểm tra mạng).' }; }
+  try { r = await fetch((school ? schoolAI() : GEM) + path, { method: body ? 'POST' : 'GET', headers: Object.assign(school ? { 'x-dh-dev': devId() } : { 'x-goog-api-key': key || gemCfg().key }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw { code: 'network', message: school ? 'Không kết nối được tới cổng AI của trường (kiểm tra mạng).' : 'Không kết nối được tới Gemini (kiểm tra mạng).' }; }
   let j = null; try { j = await r.json(); } catch (e) { }
   if (!r.ok) {
     const msg = (j && j.error && j.error.message) || ('HTTP ' + r.status);
-    throw { code: r.status === 429 ? 'rate_limited' : (r.status === 400 && /api key/i.test(msg)) || r.status === 401 || r.status === 403 ? 'bad_key' : 'gemini_error', message: msg };
+    const bad = (r.status === 400 && /api key/i.test(msg)) || r.status === 401 || r.status === 403;
+    throw { code: r.status === 429 ? 'rate_limited' : school && (bad || r.status === 500 || r.status === 413) ? 'school' : bad ? 'bad_key' : 'gemini_error', message: msg };
   }
   return j;
 }
@@ -1892,13 +1898,14 @@ function aiCfg() {
 function aiProvider() {
   if (S.cloud.sample) return 'sample';
   const c = aiCfg(); if (IS_WEB && c.provider !== 'chat' && c[c.provider] && c[c.provider].key) return c.provider;
+  if (IS_WEB && schoolAI()) return 'school';
   return 'chat';
 }
-function aiLabel() { return { sample: 'AI: Claude (tài khoản của thầy cô)', gemini: 'AI: Gemini (khóa riêng)', openai: 'AI: ChatGPT / OpenAI', claude: 'AI: Claude API', chat: 'AI: Gemini/ChatGPT trên web (sao chép – dán)' }[aiProvider()]; }
+function aiLabel() { return { sample: 'AI: Claude (tài khoản của thầy cô)', school: 'AI: Cổng AI của trường (tự động)', gemini: 'AI: Gemini (khóa riêng)', openai: 'AI: ChatGPT / OpenAI', claude: 'AI: Claude API', chat: 'AI: Gemini/ChatGPT trên web (sao chép – dán)' }[aiProvider()]; }
 async function gemGenerate(prompt, files, c) {
   if (files.reduce((a, b) => a + b.size, 0) > 12 * 1024 * 1024) throw { code: 'too_big' };
   let ids = [];
-  try { ids = (await gemModels(c.gemini.key)).map(m => m.id); } catch (e) { if (e.code === 'bad_key') throw e; }
+  try { ids = (await gemModels(c.gemini.key)).map(m => m.id); } catch (e) { if (e.code === 'bad_key' || e.code === 'school') throw e; }
   if (!ids.length) ids = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
   const rank = id => (/(preview|exp)/.test(id) ? 40 : 0) + (/flash-lite/.test(id) ? 0 : /flash/.test(id) ? 10 : 30);
   const sorted = ids.slice().sort((a, b) => rank(a) - rank(b) || b.localeCompare(a, undefined, { numeric: true }));
@@ -1912,9 +1919,9 @@ async function gemGenerate(prompt, files, c) {
       const cand = (j.candidates || [])[0];
       const txt = ((cand && cand.content && cand.content.parts) || []).map(x => x.text || '').join('');
       if (!txt) { last = { code: 'empty_completion' }; continue; }
-      if (c.gemini.model !== model) { c.gemini.model = model; LS.set('dh.ai', c); }
+      if (c.gemini.model !== model) { c.gemini.model = model; if (c.school) LS.set('dh.schoolModel', model); else LS.set('dh.ai', c); }
       return parseLooseJSON(txt);
-    } catch (e) { last = e; if (e.code === 'bad_key' || e.code === 'network') throw e; }
+    } catch (e) { last = e; if (e.code === 'bad_key' || e.code === 'network' || e.code === 'school') throw e; }
   }
   throw last || { code: 'gemini_error' };
 }
@@ -1941,6 +1948,7 @@ async function clGenerate(prompt, images, pdfs, o) {
 async function aiJSON(prompt, att = {}) {
   const mode = aiProvider(), c = aiCfg(), images = att.images || [], pdfs = att.pdfs || [];
   if (mode === 'sample') { let n = 0; try { const l = await S.cloud.sample.limits(); n = l.images ? l.images.maxCount : 0; } catch (e) { } return S.cloud.sample.json(prompt, { images: n && images.length ? images.slice(0, n) : undefined, cache: false }); }
+  if (mode === 'school') return gemGenerate(prompt, [...images, ...pdfs], { school: true, gemini: { key: '__school', model: LS.get('dh.schoolModel', '') } });
   if (mode === 'gemini') return gemGenerate(prompt, [...images, ...pdfs], c);
   if (mode === 'openai') return oaGenerate(prompt, images, c.openai);
   if (mode === 'claude') return clGenerate(prompt, images, pdfs, c.claude);
@@ -2109,6 +2117,27 @@ function aiSettingsCard() {
     if (c.provider === 'gemini' && c.gemini.key) { say('', 'Đang kiểm tra khóa với Google…'); try { const l = await gemModels(c.gemini.key); say('ok', 'Khóa hợp lệ (' + l.length + ' mô hình). Đã lưu trên máy này.'); } catch (e) { say('bad', e.code === 'bad_key' ? 'Khóa không đúng hoặc đã bị xóa.' : (e.message || 'Chưa kiểm tra được, nhưng đã lưu.')); } }
     else say('ok', 'Đã lưu trên máy này.');
   };
+  // Cổng AI chung của trường
+  const gw = h('input', { type: 'text', id: 'ai-gw', placeholder: 'https://….workers.dev', value: LS.get('dh.schoolAI', '') || SCHOOL_AI }), gmsg = h('div');
+  const gsay = (cls, t) => { gmsg.innerHTML = ''; gmsg.append(h('p', { class: 'note ' + cls }, t)); };
+  const gtest = async () => {
+    const u = gw.value.trim().replace(/\/+$/, '');
+    if (!u) { LS.set('dh.schoolAI', ''); return gsay('', SCHOOL_AI ? 'Đã trở về cổng mặc định của trường.' : 'Đã bỏ cổng AI trên máy này.'); }
+    if (!/^https:\/\/[\w.\-]+(\/[\w.\-\/]*)?$/.test(u)) return gsay('bad', 'Địa chỉ cổng phải bắt đầu bằng https://');
+    gsay('', 'Đang kiểm tra cổng…');
+    try {
+      const j = await (await fetch(u + '/')).json();
+      if (!j || !j.ok) return gsay('bad', 'Địa chỉ này không phải cổng AI của trường.');
+      if (!j.soKhoa) return gsay('bad', 'Cổng đã chạy nhưng chưa có khóa Gemini (mục GEMINI_KEY trên Cloudflare).');
+      LS.set('dh.schoolAI', u === SCHOOL_AI ? '' : u);
+      const l = await gemModels('__school');
+      gsay('ok', 'Cổng hoạt động tốt (' + j.soKhoa + ' khóa, ' + l.length + ' mô hình). Máy này đã dùng cổng. Gửi địa chỉ cổng cho người làm app để bật cho cả trường.');
+    } catch (e) { gsay('bad', e.code === 'school' ? 'Cổng báo lỗi: ' + e.message : 'Không kết nối được tới cổng. Kiểm tra lại địa chỉ.'); }
+  };
+  card.append(schoolAI() ? h('div', { class: 'note ok' }, h('b', null, 'Trường đã có cổng AI chung: thầy cô không cần cài gì. '), 'Bấm "Tạo câu hỏi bằng AI" là app tự soạn. Khi cổng hết lượt trong ngày, app tự chuyển sang cách sao chép – dán. Phần bên dưới chỉ dành cho ai muốn dùng khóa riêng.') : null,
+    h('details', { class: 'adv' }, h('summary', null, 'Dành cho quản trị: cổng AI của trường'),
+      h('div', { style: { display: 'grid', gap: '8px' } }, h('p', { class: 'small muted' }, 'Dán địa chỉ cổng Cloudflare (xem tệp hướng dẫn "HUONG_DAN_CONG_AI") rồi bấm Kiểm tra. Để trống và bấm Kiểm tra để bỏ cổng trên máy này.'),
+        h('div', { class: 'row' }, gw, h('button', { class: 'btn primary', onclick: gtest }, 'Kiểm tra cổng')), gmsg)));
   card.append(h('p', { class: 'small muted' }, 'App là trang web miễn phí, không có máy chủ riêng, nên không thể tự "đăng nhập Gmail" để gọi AI thay thầy cô. Có hai kiểu kết nối: dùng trang chat (đăng nhập Gmail như bình thường), hoặc dán khóa API riêng một lần.'),
     f('Cách kết nối', h('select', { id: 'ai-prov', onchange: e => { c.provider = e.target.value; draw(); } }, [['chat', 'Gemini / ChatGPT trên web bằng Gmail (không cần khóa) – khuyên dùng'], ['gemini', 'Gemini – khóa API miễn phí (tự động hoàn toàn)'], ['openai', 'ChatGPT / Groq / OpenRouter – khóa API'], ['claude', 'Claude – khóa API']].map(([k, n]) => h('option', { value: k, selected: c.provider === k }, n)))),
     box, h('div', { class: 'row' }, h('button', { class: 'btn primary', onclick: save }, 'Lưu và kiểm tra')), msg,
@@ -2431,7 +2460,7 @@ async function runAI(pk, opt) {
   try { finish(await aiJSON(prompt, { images, pdfs })); return true; }
   catch (e) {
     const code = e && e.code;
-    const msg = { not_granted: 'Thầy cô chưa cho phép app dùng Claude.', rate_limited: 'AI tự động đang hết lượt miễn phí.', bad_key: 'Khóa API không đúng hoặc đã bị xóa (xem mục Cài đặt).', too_big: 'Tệp đính kèm quá lớn.', invalid_json: 'AI trả về sai định dạng.', network: e && e.message, refused: 'AI từ chối nội dung này.' }[code] || ('AI báo lỗi: ' + ((e && e.message) || code || 'không rõ'));
+    const msg = { not_granted: 'Thầy cô chưa cho phép app dùng Claude.', rate_limited: 'AI tự động đang hết lượt miễn phí.', bad_key: 'Khóa API không đúng hoặc đã bị xóa (xem mục Cài đặt).', school: 'Cổng AI của trường đang chưa sẵn sàng.', too_big: 'Tệp đính kèm quá lớn.', invalid_json: 'AI trả về sai định dạng.', network: e && e.message, refused: 'AI từ chối nội dung này.' }[code] || ('AI báo lỗi: ' + ((e && e.message) || code || 'không rõ'));
     return chatUI(msg + ' Thầy cô làm theo 2 bước dưới đây là có câu hỏi ngay:');
   }
 }
@@ -2690,7 +2719,7 @@ const __exportCard0 = exportCard;
 exportCard = function (a, b) { return h('div', { style: { display: 'grid', gap: '18px' } }, cloudCard(), __exportCard0(a, b)); };
 
 /* ===== core3e (bản 4): nhiều môn, phân phối chương trình có lựa chọn, công thức toán, không nhảy màn hình, tự cập nhật ===== */
-const BUILD = '2026.11.23-1627';
+const BUILD = '2026.11.26-0848';
 
 /* ---------- Hồ sơ: một giáo viên dạy nhiều môn ---------- */
 const mySubjects = () => (S.profile.subjects && S.profile.subjects.length ? S.profile.subjects : (S.profile.subject ? [S.profile.subject] : []));
